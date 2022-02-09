@@ -36,8 +36,7 @@ import Futhark.Util.Loc hiding (L)
 
 %wrapper "monad-bytestring"
 
-@charlit = ($printable#['\\]|\\($printable|[0-9]+))
-@stringcharlit = ($printable#[\"\\]|\\($printable|[0-9]+))
+@stringchar = ($printable#['\\]|\\($printable|[0-9]+))
 @hexlit = 0[xX][0-9a-fA-F][0-9a-fA-F_]*
 @declit = [0-9][0-9_]*
 @binlit = 0[bB][01][01_]*
@@ -113,8 +112,8 @@ tokens :-
   @hexreallit f32          { tokenM $ fmap F32LIT . readHexRealLit . T.filter (/= '_') . T.dropEnd 3 }
   @hexreallit f64          { tokenM $ fmap F64LIT . readHexRealLit . T.filter (/= '_') . T.dropEnd 3 }
   @hexreallit              { tokenM $ fmap FLOATLIT . readHexRealLit . T.filter (/= '_') }
-  "'" @charlit "'"         { tokenM $ fmap CHARLIT . tryRead "char" }
-  \" @stringcharlit* \"    { tokenM $ fmap (STRINGLIT . T.pack) . tryRead "string"  }
+  "'" @stringchar "'"      { tokenM $ fmap CHARLIT . tryRead "char" }
+  \" @stringchar* \"       { tokenM $ fmap (STRINGLIT . T.pack) . tryRead "string"  }
 
   @identifier              { tokenS keyword }
   @identifier "["          { tokenM $ fmap INDEXING . indexing . T.takeWhile (/='[') }
