@@ -172,6 +172,7 @@ import Language.Futhark.Parser.Monad
       open            { L $$ OPEN }
       local           { L $$ LOCAL }
       doc             { L _  (DOC _) }
+      comment         { L _  (COMMENT _) }
       hole            { L $$ HOLE }
 
 %left bottom
@@ -201,6 +202,9 @@ import Language.Futhark.Parser.Monad
 
 Doc :: { DocComment }
      : doc { let L loc (DOC s) = $1 in DocComment s (srclocOf loc) }
+
+Comment :: { Comment }
+        : comment { let L loc (COMMENT s) = $1 in Comment s (srclocOf loc) }
 
 -- Four cases to avoid ambiguities.
 Prog :: { UncheckedProg }
