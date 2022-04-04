@@ -60,8 +60,6 @@ $opchar = [\+\-\*\/\%\=\!\>\<\|\&\^\.]
 @space = [\ \t\f\v]
 @doc = "-- |".*(\n@space*"--".*)*
 
-@comment = "--".*(\n@space*"--".*)*
-
 tokens :-
 
   $white+                               ;
@@ -69,10 +67,7 @@ tokens :-
                                       map (T.drop 3 . T.stripStart) .
                                            T.split (== '\n') . ("--"<>) .
                                            T.drop 4 }
-  @comment                 { tokenM $ pure . COMMENT . T.unpack . T.unlines .
-                                      map (T.drop 3 . T.stripStart) .
-                                           T.split (== '\n') . ("--"<>) .
-                                           T.drop 4 }
+  "--.*"                   { tokenM $ pure . COMMENT . T.unpack }
   "="                      { tokenC EQU }
   "("                      { tokenC LPAR }
   ")"                      { tokenC RPAR }
