@@ -172,7 +172,6 @@ import Language.Futhark.Parser.Monad
       open            { L $$ OPEN }
       local           { L $$ LOCAL }
       doc             { L _  (DOC _) }
-      comment         { L _  (COMMENT _) }
       hole            { L $$ HOLE }
 
 %left bottom

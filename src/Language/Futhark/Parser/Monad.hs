@@ -98,7 +98,7 @@ mustBeEmpty loc t =
 data ParserState = ParserState
   { _parserFile :: FilePath,
     parserInput :: T.Text,
-    parserLexical :: ([L Token], Pos)
+    parserLexical :: ([L Token], Pos) --liste af kommentater her
   }
 
 type ParserMonad = ExceptT SyntaxError (StateT ParserState ReadLineMonad)
@@ -189,7 +189,7 @@ getTokens :: ParserMonad ([L Token], Pos)
 getTokens = lift $ gets parserLexical
 
 putTokens :: ([L Token], Pos) -> ParserMonad ()
-putTokens l = lift $ modify $ \env -> env {parserLexical = l}
+putTokens l = lift $ modify $ \env -> env {parserLexical = l} --brug denne til at smide i liste med kommentarer
 
 primTypeFromName :: Loc -> Name -> ParserMonad PrimType
 primTypeFromName loc s = maybe boom pure $ M.lookup s namesToPrimTypes
@@ -239,7 +239,7 @@ lexer cont = do
           (ts'', pos') <- either (throwError . lexerErrToParseErr) pure ts'
           case ts'' of
             [] -> cont $ eof pos
-            xs -> do
+            xs -> do --
               putTokens (xs, pos')
               lexer cont
     (x : xs) -> do
@@ -293,6 +293,6 @@ parseInMonad p file program =
   where
     env = ParserState file program
 
-parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a
+parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a -- par med kommentarer
 parse p file program =
   either Left id $ getNoLines $ parseInMonad p file program

@@ -26,6 +26,8 @@ parseFuthark ::
   Either SyntaxError UncheckedProg
 parseFuthark = parse prog
 
+--anden mulighed, lav en parsewothcomments her
+
 -- | Parse an Futhark expression from the given 'String', using the
 -- 'FilePath' as the source name for error messages.
 parseExp ::
