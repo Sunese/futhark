@@ -293,6 +293,6 @@ parseInMonad p file program =
   where
     env = ParserState file program
 
-parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a -- par med kommentarer
+parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a -- 1. metode: returner par med kommentar og a
 parse p file program =
   either Left id $ getNoLines $ parseInMonad p file program

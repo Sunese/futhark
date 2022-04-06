@@ -80,6 +80,7 @@ module Language.Futhark.Syntax
 
     -- * Definitions
     DocComment (..),
+    Comment (..),
     ValBindBase (..),
     EntryPoint (..),
     EntryType (..),
@@ -1010,6 +1011,13 @@ data DocComment = DocComment String SrcLoc
 
 instance Located DocComment where
   locOf (DocComment _ loc) = locOf loc
+
+data Comment = Comment String SrcLoc
+  deriving (Show)
+
+instance Located Comment where
+  locOf (Comment _ loc) = locOf loc
+
 
 -- | Part of the type of an entry point.  Has an actual type, and
 -- maybe also an ascribed type expression.

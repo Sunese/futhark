@@ -34,7 +34,6 @@
 --     x `op` o == o `op` x == x
 --
 -- for any `x`.
-
 -- Implementation note: many of these definitions contain dynamically
 -- checked size casts.  These will be removed by the compiler, but are
 -- necessary for the type checker, as the 'intrinsics' functions are
