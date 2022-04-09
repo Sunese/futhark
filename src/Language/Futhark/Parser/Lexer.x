@@ -67,7 +67,7 @@ tokens :-
                                       map (T.drop 3 . T.stripStart) .
                                            T.split (== '\n') . ("--"<>) .
                                            T.drop 4 }
-  "--".*                   { tokenM $ pure . COMMENT . T.unpack }
+  "--".*                   { tokenM $ pure . COM . T.unpack }
   "="                      { tokenC EQU }
   "("                      { tokenC LPAR }
   ")"                      { tokenC RPAR }

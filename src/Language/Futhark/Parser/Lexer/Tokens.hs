@@ -133,7 +133,7 @@ data Token
   | MATCH
   | CASE
   | DOC String
-  | COMMENT String
+  | COM String
   | EOF
   | HOLE
   deriving (Show, Eq, Ord)

@@ -243,8 +243,13 @@ lexer cont = do
               putTokens (xs, pos')
               lexer cont
     (x : xs) -> do
-      putTokens (xs, pos)
-      cont x
+      case x of
+        L _ COM {} -> do
+          putTokens (xs, pos)
+          lexer cont
+        _ -> do
+          putTokens (xs, pos)
+          cont x
 
 parseError :: (L Token, [String]) -> ParserMonad a
 parseError (L loc EOF, expected) =
