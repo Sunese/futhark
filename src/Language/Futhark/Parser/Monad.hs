@@ -239,14 +239,14 @@ lexer cont = do
           (ts'', pos') <- either (throwError . lexerErrToParseErr) pure ts'
           case ts'' of
             [] -> cont $ eof pos
-            xs -> do --
+            xs -> do
               putTokens (xs, pos')
               lexer cont
     (x : xs) -> do
       case x of
-        L _ COM {} -> do
+        L _ COMMENT {} -> do
           putTokens (xs, pos)
-          lexer cont
+          lexer cont -- i think this means we skip x, which is a comment
         _ -> do
           putTokens (xs, pos)
           cont x
