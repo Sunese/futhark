@@ -30,7 +30,7 @@ import Language.Futhark.Core (Int8, Int16, Int32, Int64,
                               Word8, Word16, Word32, Word64,
                               Name, nameFromText, nameToText)
 import Language.Futhark.Prop (leadingOperator)
-import Language.Futhark.Syntax (BinOp(..))
+import Language.Futhark.Syntax (BinOp(..), Comment(..))
 import Language.Futhark.Parser.Lexer.Wrapper
 import Language.Futhark.Parser.Lexer.Tokens
 import qualified Data.ByteString.Internal as ByteString (w2c)
@@ -148,20 +148,20 @@ getToken = do
       alexSetInput inp'
       action inp len
 
-scanTokens :: Pos -> BS.ByteString -> Either LexerError ([L Token], Pos)
+scanTokens :: Pos -> BS.ByteString -> Either LexerError ([L Token], [L Comment], Pos)
 scanTokens pos str =
   runAlex' pos str $ do
   fix $ \loop -> do
     tok <- getToken
     case tok of
       (start, end, EOF) ->
-        pure ([], end)
+        pure ([], [], end)
       (start, end, t) -> do
-        (rest, endpos) <- loop
-        pure (L (Loc start end) t : rest, endpos)
+        (rest, _, endpos) <- loop
+        pure (L (Loc start end) t : rest, [], endpos)
 
 -- | Given a starting position, produce tokens from the given text (or
 -- a lexer error).  Returns the final position.
-scanTokensText :: Pos -> T.Text -> Either LexerError ([L Token], Pos)
+scanTokensText :: Pos -> T.Text -> Either LexerError ([L Token], [L Comment], Pos)
 scanTokensText pos = scanTokens pos . BS.fromStrict . T.encodeUtf8
 }

@@ -98,7 +98,7 @@ mustBeEmpty loc t =
 data ParserState = ParserState
   { _parserFile :: FilePath,
     parserInput :: T.Text,
-    parserLexical :: ([L Token], Pos) --liste af kommentater her
+    parserLexical :: ([L Token], [L Comment], Pos) --liste af kommentater her
   }
 
 type ParserMonad = ExceptT SyntaxError (StateT ParserState ReadLineMonad)
@@ -185,10 +185,10 @@ binOp x (L loc (SYMBOL _ qs op)) y =
   AppExp (BinOp (QualName qs op, srclocOf loc) NoInfo (x, NoInfo) (y, NoInfo) (srcspan x y)) NoInfo
 binOp _ t _ = error $ "binOp: unexpected " ++ show t
 
-getTokens :: ParserMonad ([L Token], Pos)
+getTokens :: ParserMonad ([L Token], [L Comment], Pos)
 getTokens = lift $ gets parserLexical
 
-putTokens :: ([L Token], Pos) -> ParserMonad ()
+putTokens :: ([L Token], [L Comment], Pos) -> ParserMonad ()
 putTokens l = lift $ modify $ \env -> env {parserLexical = l} --brug denne til at smide i liste med kommentarer
 
 primTypeFromName :: Loc -> Name -> ParserMonad PrimType
@@ -224,7 +224,7 @@ readLine = do
 
 lexer :: (L Token -> ParserMonad a) -> ParserMonad a
 lexer cont = do
-  (ts, pos) <- getTokens
+  (ts, comments, pos) <- getTokens
   case ts of
     [] -> do
       ended <- lift $ runExceptT $ cont $ eof pos
@@ -235,20 +235,20 @@ lexer cont = do
           ts' <-
             case line of
               Nothing -> throwError parse_e
-              Just line' -> pure $ scanTokensText (advancePos pos '\n') line'
-          (ts'', pos') <- either (throwError . lexerErrToParseErr) pure ts'
+              Just line' -> pure $ scanTokensText (advancePos pos '\n') line' -- i think scanTokens in Lexer.x needs to put comment in list
+          (ts'', _, pos') <- either (throwError . lexerErrToParseErr) pure ts'
           case ts'' of
             [] -> cont $ eof pos
             xs -> do
-              putTokens (xs, pos')
+              putTokens (xs, comments, pos')
               lexer cont
     (x : xs) -> do
       case x of
-        L _ COMMENT {} -> do
-          putTokens (xs, pos)
+        L loc COMMENT {} -> do
+          putTokens (xs, comments, pos)
           lexer cont -- i think this means we skip x, which is a comment
         _ -> do
-          putTokens (xs, pos)
+          putTokens (xs, comments, pos)
           cont x
 
 parseError :: (L Token, [String]) -> ParserMonad a
