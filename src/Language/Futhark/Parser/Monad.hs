@@ -98,7 +98,7 @@ mustBeEmpty loc t =
 data ParserState = ParserState
   { _parserFile :: FilePath,
     parserInput :: T.Text,
-    parserLexical :: ([L Token], [L Comment], Pos) --liste af kommentater her
+    parserLexical :: ([L Token], [L Token], Pos) --liste af kommentater her
   }
 
 type ParserMonad = ExceptT SyntaxError (StateT ParserState ReadLineMonad)
@@ -185,10 +185,10 @@ binOp x (L loc (SYMBOL _ qs op)) y =
   AppExp (BinOp (QualName qs op, srclocOf loc) NoInfo (x, NoInfo) (y, NoInfo) (srcspan x y)) NoInfo
 binOp _ t _ = error $ "binOp: unexpected " ++ show t
 
-getTokens :: ParserMonad ([L Token], [L Comment], Pos)
+getTokens :: ParserMonad ([L Token], [L Token], Pos)
 getTokens = lift $ gets parserLexical
 
-putTokens :: ([L Token], [L Comment], Pos) -> ParserMonad ()
+putTokens :: ([L Token], [L Token ], Pos) -> ParserMonad ()
 putTokens l = lift $ modify $ \env -> env {parserLexical = l} --brug denne til at smide i liste med kommentarer
 
 primTypeFromName :: Loc -> Name -> ParserMonad PrimType
@@ -244,8 +244,8 @@ lexer cont = do
               lexer cont
     (x : xs) -> do
       case x of
-        L loc COMMENT {} -> do
-          putTokens (xs, comments, pos)
+        (L loc (COMMENT s)) -> do
+          putTokens (xs, L loc (COMMENT s) : comments, pos)
           lexer cont -- i think this means we skip x, which is a comment
         _ -> do
           putTokens (xs, comments, pos)

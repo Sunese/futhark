@@ -86,6 +86,7 @@ library
       Futhark.CLI.Defs
       Futhark.CLI.Dev
       Futhark.CLI.Doc
+      Futhark.CLI.Fmt
       Futhark.CLI.Literate
       Futhark.CLI.LSP
       Futhark.CLI.Misc

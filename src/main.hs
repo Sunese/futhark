@@ -18,6 +18,7 @@ import qualified Futhark.CLI.Dataset as Dataset
 import qualified Futhark.CLI.Defs as Defs
 import qualified Futhark.CLI.Dev as Dev
 import qualified Futhark.CLI.Doc as Doc
+import qualified Futhark.CLI.Fmt as Fmt
 import qualified Futhark.CLI.LSP as LSP
 import qualified Futhark.CLI.Literate as Literate
 import qualified Futhark.CLI.Misc as Misc
@@ -72,6 +73,7 @@ commands =
       ("hash", (Misc.mainHash, "Print hash of program AST.")),
       ("autotune", (Autotune.main, "Autotune threshold parameters.")),
       ("defs", (Defs.main, "Show location and name of all definitions.")),
+      ("fmt", (Fmt.main, "Reformat a Futhark source file.")),
       ("query", (Query.main, "Query semantic information about program.")),
       ("literate", (Literate.main, "Process a literate Futhark program.")),
       ("lsp", (LSP.main, "Run LSP server.")),

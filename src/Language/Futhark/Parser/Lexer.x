@@ -148,7 +148,7 @@ getToken = do
       alexSetInput inp'
       action inp len
 
-scanTokens :: Pos -> BS.ByteString -> Either LexerError ([L Token], [L Comment], Pos)
+scanTokens :: Pos -> BS.ByteString -> Either LexerError ([L Token], [L Token], Pos)
 scanTokens pos str =
   runAlex' pos str $ do
   fix $ \loop -> do
@@ -162,6 +162,6 @@ scanTokens pos str =
 
 -- | Given a starting position, produce tokens from the given text (or
 -- a lexer error).  Returns the final position.
-scanTokensText :: Pos -> T.Text -> Either LexerError ([L Token], [L Comment], Pos)
+scanTokensText :: Pos -> T.Text -> Either LexerError ([L Token], [L Token], Pos)
 scanTokensText pos = scanTokens pos . BS.fromStrict . T.encodeUtf8
 }
