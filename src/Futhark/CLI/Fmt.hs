@@ -66,4 +66,9 @@ main = mainWithOptions () [] "program" $ \args () ->
         Right prog -> do
           --T.putStrLn $ prettyText prog
           printElements $ defsInProg prog
+          -- use list produced in printElements (instead of just printing)
+          -- index into loc of each def and check if there has been a comment before a.k.a. flush
+            
+          -- TODO: how do we properly access the Token list of Comments from 
+          -- ParserState in monad.hs?
     _ -> Nothing
