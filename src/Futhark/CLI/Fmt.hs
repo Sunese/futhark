@@ -14,6 +14,7 @@ import Futhark.Compiler
 import Futhark.Util.Loc
 import Futhark.Util.Options
 import Language.Futhark
+import Data.Foldable (toList)
 
 data DefKind = Value | Module | ModuleType | Type
 
@@ -50,6 +51,9 @@ defsInProg = foldMap defsInDec . progDecs
     defsInModExp (ModAscript me _ _ _) = defsInModExp me
     defsInModExp (ModLambda _ _ me _) = defsInModExp me
 
+printElements :: Seq.Seq Def -> IO()
+printElements = mapM_ printDef . toList
+
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
 main = mainWithOptions () [] "program" $ \args () ->
@@ -61,5 +65,5 @@ main = mainWithOptions () [] "program" $ \args () ->
           exitWith $ ExitFailure 2
         Right prog -> do
           --T.putStrLn $ prettyText prog
-          printDef $ Seq.index (defsInProg prog) 0
+          printElements $ defsInProg prog
     _ -> Nothing
