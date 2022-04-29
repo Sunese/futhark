@@ -65,7 +65,13 @@ main = mainWithOptions () [] "program" $ \args () ->
           exitWith $ ExitFailure 2
         Right prog -> do
           --T.putStrLn $ prettyText prog
-          printElements $ defsInProg prog
+          --printElements $ defsInProg prog
+          case progDoc prog of
+            Nothing -> do
+              T.putStrLn $ "No documentation found."
+              exitWith $ ExitFailure 2
+            Just (DocComment com _) -> do
+              T.putStrLn $ prettyText com
           -- use list produced in printElements (instead of just printing)
           -- index into loc of each def and check if there has been a comment before a.k.a. flush
             
