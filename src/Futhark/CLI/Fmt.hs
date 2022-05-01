@@ -62,16 +62,29 @@ main = mainWithOptions () [] "program" $ \args () ->
       s <- T.readFile file
       case parseFuthark file s of
         Left e -> do
-          exitWith $ ExitFailure 2
-        Right prog -> do
+          T.putStrLn "Parse error"
+        Right (Prog doc decs) -> do
           --T.putStrLn $ prettyText prog
           --printElements $ defsInProg prog
-          case progDoc prog of
+
+          -- let's play with doc comments
+          print $ show Prog { progDoc = doc, progDecs = decs }
+          case doc of
             Nothing -> do
-              T.putStrLn $ "No documentation found."
-              exitWith $ ExitFailure 2
-            Just (DocComment com _) -> do
-              T.putStrLn $ prettyText com
+              T.putStrLn "No documentation found."
+            Just (DocComment com pos) -> do
+              T.putStrLn $ prettyText com -- this prints actual doccomment
+              putStrLn $ locStr (srclocOf pos) -- this prints position of doccomment
+
+              -- let's play with declaration list
+              case decs of
+                [] -> do
+                  T.putStrLn "No declarations found."
+                _ -> do
+                  T.putStrLn "Declarations found:"
+
+                  --T.putStrLn $ prettyText $ head decs
+
           -- use list produced in printElements (instead of just printing)
           -- index into loc of each def and check if there has been a comment before a.k.a. flush
             
