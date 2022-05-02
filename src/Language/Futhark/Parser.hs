@@ -3,6 +3,7 @@
 -- | Interface to the Futhark parser.
 module Language.Futhark.Parser
   ( parseFuthark,
+    parseWithComments,
     parseExp,
     parseModExp,
     parseType,
@@ -17,6 +18,8 @@ import qualified Data.Text as T
 import Language.Futhark.Parser.Parser
 import Language.Futhark.Prop
 import Language.Futhark.Syntax
+import Language.Futhark.Parser.Lexer.Tokens
+import Language.Futhark.Parser.Monad
 
 -- | Parse an entire Futhark program from the given 'T.Text', using
 -- the 'FilePath' as the source name for error messages.
@@ -27,6 +30,11 @@ parseFuthark ::
 parseFuthark = parse prog
 
 --anden mulighed, lav en parsewothcomments her
+parseWithComments ::
+  (FilePath -> T.Text -> Either SyntaxError UncheckedProg,
+  FilePath -> T.Text -> Either SyntaxError [L Token])
+parseWithComments =
+  (parse prog, getCommentTokens prog)
 
 -- | Parse an Futhark expression from the given 'String', using the
 -- 'FilePath' as the source name for error messages.

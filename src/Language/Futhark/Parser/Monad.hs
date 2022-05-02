@@ -12,6 +12,7 @@ module Language.Futhark.Parser.Monad
     ReadLineMonad (..),
     parseInMonad,
     parse,
+    getCommentTokens,
     getLinesFromM,
     lexer,
     mustBeEmpty,
@@ -243,13 +244,8 @@ lexer cont = do
               putTokens (xs, comments, pos')
               lexer cont
     (x : xs) -> do
-      case x of
-        (L loc (COMMENT s)) -> do
-          putTokens (xs, L loc (COMMENT s) : comments, pos)
-          lexer cont -- i think this means we skip x, which is a comment
-        _ -> do
-          putTokens (xs, comments, pos)
-          cont x
+      putTokens (xs, comments, pos)
+      cont x
 
 parseError :: (L Token, [String]) -> ParserMonad a
 parseError (L loc EOF, expected) =
@@ -298,6 +294,12 @@ parseInMonad p file program =
   where
     env = ParserState file program
 
-parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a -- 1. metode: returner par med kommentar og a
+parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a 
 parse p file program =
-  either Left id $ getNoLines $ parseInMonad p file program
+ either Left id $ getNoLines $ parseInMonad p file program
+
+getCommentTokens :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError [L Token]
+getCommentTokens p file program = do
+  case scanTokensText (Pos file 1 1 0) program of
+    Left err -> Left $ lexerErrToParseErr err
+    Right (_, comments, _) -> Right comments

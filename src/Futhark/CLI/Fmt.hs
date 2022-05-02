@@ -4,7 +4,7 @@
 module Futhark.CLI.Fmt (main) where
 
 import Futhark.Util.Pretty (prettyText)
-import Language.Futhark.Parser (parseFuthark)
+import Language.Futhark.Parser (parseWithComments)
 import System.Exit
 import System.IO
 import qualified Data.Sequence as Seq
@@ -15,6 +15,9 @@ import Futhark.Util.Loc
 import Futhark.Util.Options
 import Language.Futhark
 import Data.Foldable (toList)
+import System.Directory.Tree (DirTree(err))
+import Futhark.Pkg.Types (Commented(comments))
+import Language.Futhark.Parser.Lexer.Tokens
 
 data DefKind = Value | Module | ModuleType | Type
 
@@ -60,34 +63,10 @@ main = mainWithOptions () [] "program" $ \args () ->
   case args of
     [file] -> Just $ do
       s <- T.readFile file
-      case parseFuthark file s of
-        Left e -> do
-          T.putStrLn "Parse error"
-        Right (Prog doc decs) -> do
-          --T.putStrLn $ prettyText prog
-          --printElements $ defsInProg prog
-
-          -- let's play with doc comments
-          print $ show Prog { progDoc = doc, progDecs = decs }
-          case doc of
-            Nothing -> do
-              T.putStrLn "No documentation found."
-            Just (DocComment com pos) -> do
-              T.putStrLn $ prettyText com -- this prints actual doccomment
-              putStrLn $ locStr (srclocOf pos) -- this prints position of doccomment
-
-              -- let's play with declaration list
-              case decs of
-                [] -> do
-                  T.putStrLn "No declarations found."
-                _ -> do
-                  T.putStrLn "Declarations found:"
-
-                  --T.putStrLn $ prettyText $ head decs
-
-          -- use list produced in printElements (instead of just printing)
-          -- index into loc of each def and check if there has been a comment before a.k.a. flush
-            
-          -- TODO: how do we properly access the Token list of Comments from 
-          -- ParserState in monad.hs?
+      case parseWithComments file s of
+        Left err -> do
+          hPutStrLn stderr $ "Parse error: " ++ show err
+          exitFailure
+        Right (prog, _) -> do
+          printElements $ defsInProg prog
     _ -> Nothing

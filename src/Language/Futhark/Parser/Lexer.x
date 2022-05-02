@@ -156,9 +156,12 @@ scanTokens pos str =
     case tok of
       (start, end, EOF) ->
         pure ([], [], end)
+      (start, end, COMMENT s) -> do
+        (rest, comments, endpos) <- loop
+        pure (rest, L (Loc start end) (COMMENT s) : comments, endpos)
       (start, end, t) -> do
-        (rest, _, endpos) <- loop
-        pure (L (Loc start end) t : rest, [], endpos)
+        (rest, comments, endpos) <- loop
+        pure (L (Loc start end) t : rest, comments, endpos)
 
 -- | Given a starting position, produce tokens from the given text (or
 -- a lexer error).  Returns the final position.
