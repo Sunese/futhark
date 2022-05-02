@@ -31,10 +31,10 @@ parseFuthark = parse prog
 
 --anden mulighed, lav en parsewothcomments her
 parseWithComments ::
-  (FilePath -> T.Text -> Either SyntaxError UncheckedProg,
-  FilePath -> T.Text -> Either SyntaxError [L Token])
-parseWithComments =
-  (parse prog, getCommentTokens prog)
+  FilePath ->
+  T.Text ->
+  (Either SyntaxError UncheckedProg, [L Token])
+parseWithComments = parseComments prog
 
 -- | Parse an Futhark expression from the given 'String', using the
 -- 'FilePath' as the source name for error messages.

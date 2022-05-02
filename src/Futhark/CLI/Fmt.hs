@@ -65,8 +65,7 @@ main = mainWithOptions () [] "program" $ \args () ->
       s <- T.readFile file
       case parseWithComments file s of
         Left err -> do
-          hPutStrLn stderr $ "Parse error: " ++ show err
-          exitFailure
+          T.putStrLn $ prettyText "error"
         Right (prog, _) -> do
           printElements $ defsInProg prog
     _ -> Nothing

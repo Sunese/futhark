@@ -12,7 +12,7 @@ module Language.Futhark.Parser.Parser
   , anyValue
   , anyValues
   , parse
-  , getCommentTokens
+  , parseComments
   , ReadLineMonad (..)
   , getLinesFromM
   , parseInMonad

@@ -12,7 +12,7 @@ module Language.Futhark.Parser.Monad
     ReadLineMonad (..),
     parseInMonad,
     parse,
-    getCommentTokens,
+    parseComments,
     getLinesFromM,
     lexer,
     mustBeEmpty,
@@ -294,9 +294,17 @@ parseInMonad p file program =
   where
     env = ParserState file program
 
-parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a 
-parse p file program =
+parse :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError a
+parse p file program = do 
  either Left id $ getNoLines $ parseInMonad p file program
+
+parseComments :: ParserMonad a -> FilePath -> T.Text -> (Either SyntaxError a, [L Token])
+parseComments p file program = do 
+ (either Left id $ getNoLines $ parseInMonad p file program, extractCommentList $ scanTokensText (Pos file 1 1 0) program)
+
+extractCommentList :: Either LexerError ([L Token], [L Token], Pos) -> [L Token]
+extractCommentList (Left _) = []
+extractCommentList (Right (_, cs, _)) = cs
 
 getCommentTokens :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError [L Token]
 getCommentTokens p file program = do
