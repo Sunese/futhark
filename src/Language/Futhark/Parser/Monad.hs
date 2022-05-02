@@ -305,9 +305,3 @@ parseComments p file program = do
 extractCommentList :: Either LexerError ([L Token], [L Token], Pos) -> [L Token]
 extractCommentList (Left _) = []
 extractCommentList (Right (_, cs, _)) = cs
-
-getCommentTokens :: ParserMonad a -> FilePath -> T.Text -> Either SyntaxError [L Token]
-getCommentTokens p file program = do
-  case scanTokensText (Pos file 1 1 0) program of
-    Left err -> Left $ lexerErrToParseErr err
-    Right (_, comments, _) -> Right comments
