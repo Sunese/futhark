@@ -3,6 +3,7 @@
 -- | @futhark fmt@
 module Futhark.CLI.Fmt (main) where
 
+import Data.Loc
 import Language.Futhark.Parser (parseWithComments)
 import Data.Function (fix)
 import qualified Data.Text.IO as T
@@ -15,18 +16,30 @@ import System.Exit
 import System.IO
 import Data.Text
 import Data.List
+import Data.Data (Data)
+
 
 unpackCommentString :: L Token -> String
 unpackCommentString (L _ (COMMENT s)) = s
 unpackCommentString _ = error "unpackCommentString: not a comment"
 
 unpackTokenLoc :: L Token -> Loc
-unpackTokenLoc (L loc _) = loc
+unpackTokenLoc (L loc a) = loc
+
+locColumn :: Loc -> Column
+locColumn (Loc _ (LineCol _ c)) = c
+
+unpackColumn :: L Token -> Int
+unpackColumn = locColumn . unpackTokenLoc
 
 -- check if there has been a comment before the given token
 hasCommentBefore :: UncheckedDec -> L Token -> Bool
 hasCommentBefore dec comment =
   locOf dec > unpackTokenLoc comment
+
+calculateTakeAmount :: [UncheckedDec] -> Int
+calculateTakeAmount queue = do
+  Data.List.foldl unpackTokenLoc 0 queue
 
 flush :: Text -> [UncheckedDec] -> [UncheckedDec] -> [L Token] -> IO ()
 flush s decs decsQueue comments = do
@@ -39,9 +52,9 @@ flush s decs decsQueue comments = do
   if hasCommentBefore (Data.List.head decs) (Data.List.head comments) 
     then do
       T.putStrLn s
+
   else do 
     flush s (Data.List.tail decs) (Data.List.head decs : decsQueue) comments
-
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
