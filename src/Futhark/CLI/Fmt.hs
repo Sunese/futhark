@@ -3,20 +3,24 @@
 -- | @futhark fmt@
 module Futhark.CLI.Fmt (main) where
 
-
-import Language.Futhark.Parser (parseWithComments)
-import Data.Function (fix)
+import Data.Text (Text, append, pack, take, takeEnd, strip, unpack)
 import qualified Data.Text.IO as T
+import Data.Function (fix)
 import Futhark.Util.Loc
 import Futhark.Util.Options
 import Futhark.Util.Pretty (prettyText)
 import Language.Futhark
+import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, syntaxErrorLoc))
 import Language.Futhark.Parser.Lexer.Tokens
+import Prelude hiding (take, writeFile)
 import System.Exit
 import System.IO
-import Data.Text
-import Data.List
-import Data.Loc
+import Data.Text.IO (writeFile)
+
+
+import Data.List ( map, length, head, tail )
+import Data.Aeson.Key (toString)
+import Control.Monad.Cont (MonadIO(liftIO))
 
 unpackCommentString :: L Token -> String
 unpackCommentString (L _ (COMMENT s)) = s
@@ -25,8 +29,8 @@ unpackCommentString _ = error "unpackCommentString: not a comment"
 unpackTokenLoc :: L Token -> Loc
 unpackTokenLoc (L loc a) = loc
 
-unpackColumn :: L Token -> Int
-unpackColumn tok = do
+unpackColTok :: L Token -> Int
+unpackColTok tok = do
   case tok of 
     L loc _ -> 
       case loc of
@@ -35,8 +39,8 @@ unpackColumn tok = do
           case end of
             Pos _ _ col _ -> col
 
-unpackDec :: UncheckedDec -> Int
-unpackDec dec = do
+unpackColDec :: UncheckedDec -> Int
+unpackColDec dec = do
   case dec of
     ValDec vbb -> case vbb of
       ValBind _ _ _ _ _ _ _ _ _ sl -> 
@@ -56,37 +60,47 @@ hasCommentBefore :: UncheckedDec -> L Token -> Bool
 hasCommentBefore dec comment =
   locOf dec > unpackTokenLoc comment
 
-calculateTakeAmount :: [UncheckedDec] -> Int
-calculateTakeAmount queue = do
-  sum (Data.List.map unpackDec queue) + Data.List.length queue - 1
+noOfCharacters :: [UncheckedDec] -> Int
+noOfCharacters queue = do
+  sum (map unpackColDec queue) + length queue
 
-flush :: 
-  Text -> 
-  [UncheckedDec] -> 
-  [UncheckedDec] -> 
-  Text -> 
-  [L Token] -> 
-  IO ()
-flush s decs decsQueue programText comments = do
-  -- check all decs
-  -- if one of them hasCommentBefore, then 'take' until that comment and
-  -- concatenate comment literal/string onto taken stuff and
-  -- proceed onto checking next dec
-
-  -- calculate how many chars to take by checking end position of each declaration (col) + 1 for linebreak
-  case decs of
-      [] -> T.putStrLn "decs empty"
+format ::
+  Text ->
+  [UncheckedDec] ->
+  [UncheckedDec] ->
+  [UncheckedDec] ->
+  Text ->
+  Text ->
+  [L Token] ->
+  Text
+format s decs decs' decsQueue programText rest comments = do
+  case decs' of
+      [] -> programText
       _ -> do
         case comments of
-          [] -> T.putStrLn "comments empty"
+          [] -> append programText rest
           _ -> do
-            if hasCommentBefore (Data.List.head decs) (Data.List.head comments) 
+            if hasCommentBefore (head decs') (head comments)
               then do
-                T.putStrLn $ Data.Text.take (calculateTakeAmount decsQueue) s
-                -- something like programText ++ (Data.Text.take (calculateTakeAmount decsQueue) s)
+                format
+                  s
+                  decs
+                  (tail decs')
+                  (head decs' : decsQueue)
+                  (append
+                    (append programText (take (noOfCharacters decsQueue) s))
+                    (append (pack $ unpackCommentString (head comments)) "\n"))
+                  (takeEnd (noOfCharacters decs - noOfCharacters decsQueue) s)
+                  (tail comments)
             else do
-              flush s (Data.List.tail decs) (Data.List.head decs : decsQueue) programText comments
-    
+              format 
+                s
+                decs
+                (tail decs')
+                (head decs' : decsQueue)
+                programText 
+                rest
+                comments
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
@@ -96,8 +110,10 @@ main = mainWithOptions () [] "program" $ \args () ->
       s <- T.readFile file
       case parseWithComments file s of
           (Left e, _) -> do
-            hPutStrLn stderr "Parse error: "
+            putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e 
+            putStrLn "File has not been changed."
             exitWith $ ExitFailure 2
           (Right Prog { progDoc = doc, progDecs = decs }, comments) -> do
-            flush s decs [] "" comments
+            --Data.Text.IO.writeFile file $ format s decs decs [] "" s comments
+            T.putStr $ format s decs decs [] "" s comments
     _ -> Nothing
