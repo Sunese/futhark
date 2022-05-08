@@ -135,24 +135,23 @@ format_ lines' linesRest decs comments = do
     [] -> do
       case comments of
         [] -> unlines lines'
-        _ -> do -- no more decs, but still some comments
-          format_ lines' linesRest decs comments
+        _ -> do -- no more decs, but still some comments, just eat the rest
+          unlines $ lines' ++ linesRest
     _ -> do
       case comments of
-        [] -> unlines $ lines' ++ linesRest -- no more comments, but still some decs
+        [] -> unlines $ lines' ++ linesRest -- no more comments, but still some decs, just eat the rest
         _ -> do
           if hasCommentBefore (head decs) (head comments) then do
             -- figure out if comment is on its own line or not
             let commentLine = unpackTokLine (head comments) -- 2
-            let (a,b) = Prelude.splitAt (commentLine - length lines') linesRest -- [com,main]
-            let lines' = lines' ++ a
-            let linesRest = b
-            format_ lines' linesRest (tail decs) (tail comments)
+            let (a, linesRest') = Prelude.splitAt (commentLine - length lines') linesRest -- [com,main]
+            let lines'' = lines' ++ a
+            format_ lines'' linesRest' (tail decs) (tail comments)
           else do
             -- get end line pos of dec
             let pos = unpackDecLine (head decs)
-            let (lines', linesRest) = Prelude.splitAt (pos - length lines') linesRest
-            format_ lines' linesRest (tail decs) comments
+            let (lines'', linesRest') = Prelude.splitAt (pos - length lines') linesRest
+            format_ lines'' linesRest' (tail decs) comments
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
