@@ -53,28 +53,28 @@ unpackDecEndLine dec = do
     _ -> -1
 
 format :: [Text] -> [Text] -> [UncheckedDec] -> [L Token] -> Text
-format lines' linesRest decs comments = do
+format srcLines srcLinesRest decs comments = do
   case decs of
     [] -> do
       case comments of
-        [] -> unlines $ lines' ++ linesRest
-        _ -> do -- no more decs, but still some comments, just eat the rest
-          unlines $ lines' ++ linesRest
+        [] -> unlines $ srcLines ++ srcLinesRest
+        _ -> do -- no more decs, but still some comments, just consume the rest
+          unlines $ srcLines ++ srcLinesRest
     _ -> do
       case comments of
-        [] -> unlines $ lines' ++ linesRest -- no more comments, but still some decs, just eat the rest
+        [] -> unlines $ srcLines ++ srcLinesRest -- no more comments, but still some decs, just consume the rest
         _ -> do
           if locOf (head decs) > unpackTokenLoc (head comments) then do
-            let commentLine = unpackTokLine (head comments)
-            let (a, linesRest') = Prelude.splitAt (commentLine - length lines') linesRest
-            let lines'' = lines' ++ a
-            format lines'' linesRest' (tail decs) (tail comments)
+            let commentEndLine = unpackTokLine (head comments)
+            let (srcLines', srcLinesRest') = Prelude.splitAt (commentEndLine - length srcLines) srcLinesRest
+            let srcLines'' = srcLines ++ srcLines'
+            format srcLines'' srcLinesRest' (tail decs) (tail comments)
           else do
             -- get end line pos of dec
             let decLineNo = unpackDecEndLine (head decs)
-            let (lines'', linesRest') = Prelude.splitAt (decLineNo - length lines') linesRest
-            let lines''' = lines' ++ lines''
-            format lines''' linesRest' (tail decs) comments
+            let (srcLines', srcLinesRest') = Prelude.splitAt (decLineNo - length srcLines) srcLinesRest
+            let srcLines'' = srcLines ++ srcLines'
+            format srcLines'' srcLinesRest' (tail decs) comments
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
