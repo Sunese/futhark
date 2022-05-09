@@ -3,28 +3,19 @@
 -- | @futhark fmt@
 module Futhark.CLI.Fmt (main) where
 
-import Data.Text (Text, append, pack, take, takeEnd, strip, unpack, stripEnd, unlines, lines)
+import Data.Text (Text, lines, unlines)
 import qualified Data.Text.IO as T
-import Data.Function (fix)
 import Futhark.Util.Loc
 import Futhark.Util.Options ( mainWithOptions )
-import Futhark.Util.Pretty (prettyText)
 import Language.Futhark
 import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, syntaxErrorLoc))
 import Language.Futhark.Parser.Lexer.Tokens
 import Prelude hiding (writeFile, unlines, lines)
 import System.Exit
-import System.IO
-import Data.Text.IO (writeFile)
-
-
-import Data.List ( map, length, head, tail )
-import Data.Aeson.Key (toString)
-import Control.Monad.Cont (MonadIO(liftIO))
 --import qualified System.Posix.Internals as T
 
-unpackTokenLoc :: L Token -> Loc
-unpackTokenLoc (L loc _) = loc
+unpackTokLoc :: L Token -> Loc
+unpackTokLoc (L loc _) = loc
 
 unpackTokLine :: L Token -> Int
 unpackTokLine tok = do
@@ -64,7 +55,7 @@ format srcLines srcLinesRest decs comments = do
       case comments of
         [] -> unlines $ srcLines ++ srcLinesRest -- no more comments, but still some decs, just consume the rest
         _ -> do
-          if locOf (head decs) > unpackTokenLoc (head comments) then do
+          if locOf (head decs) > unpackTokLoc (head comments) then do
             let commentEndLine = unpackTokLine (head comments)
             let (srcLines', srcLinesRest') = Prelude.splitAt (commentEndLine - length srcLines) srcLinesRest
             let srcLines'' = srcLines ++ srcLines'
@@ -87,7 +78,7 @@ main = mainWithOptions () [] "program" $ \args () ->
             putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e 
             putStrLn "File has not been changed."
             exitWith $ ExitFailure 2
-          (Right Prog { progDoc = doc, progDecs = decs }, comments) -> do
+          (Right Prog { progDoc = _, progDecs = decs }, comments) -> do
             --Data.Text.IO.writeFile file $ format [] (lines s) decs comments
             T.putStrLn $ format [] (lines s) decs comments
     _ -> Nothing
