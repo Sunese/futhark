@@ -12,36 +12,27 @@ import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, 
 import Language.Futhark.Parser.Lexer.Tokens
 import Prelude hiding (writeFile, unlines, lines)
 import System.Exit
---import qualified System.Posix.Internals as T
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
 
-unpackTokLine :: L Token -> Int
-unpackTokLine tok = do
+unpackTokEndLine :: L Token -> Int
+unpackTokEndLine tok = do
   case tok of 
     L loc _ -> 
       case loc of
-        NoLoc -> -1
+        NoLoc -> error "NoLoc"
         Loc _ end -> 
           case end of
             Pos _ line _ _ -> line
 
 unpackDecEndLine :: UncheckedDec -> Int
 unpackDecEndLine dec = do
-  case dec of
-    ValDec vbb -> case vbb of
-      ValBind _ _ _ _ _ _ _ _ _ sl -> 
-        case sl of
-          sl' -> 
-            case sl' of
-              SrcLoc loc -> 
-                case loc of
-                  NoLoc -> -1
-                  Loc _ end -> 
-                    case end of
-                      Pos _ line _ _ -> line
-    _ -> -1
+  case locOf dec of
+    NoLoc -> error "NoLoc"
+    Loc _ end -> 
+      case end of
+        Pos _ line _ _ -> line
 
 format :: [Text] -> [Text] -> [UncheckedDec] -> [L Token] -> Text
 format srcLines srcLinesRest decs comments = do
@@ -56,12 +47,11 @@ format srcLines srcLinesRest decs comments = do
         [] -> unlines $ srcLines ++ srcLinesRest -- no more comments, but still some decs, just consume the rest
         _ -> do
           if locOf (head decs) > unpackTokLoc (head comments) then do
-            let commentEndLine = unpackTokLine (head comments)
+            let commentEndLine = unpackTokEndLine (head comments)
             let (srcLines', srcLinesRest') = Prelude.splitAt (commentEndLine - length srcLines) srcLinesRest
             let srcLines'' = srcLines ++ srcLines'
             format srcLines'' srcLinesRest' (tail decs) (tail comments)
           else do
-            -- get end line pos of dec
             let decLineNo = unpackDecEndLine (head decs)
             let (srcLines', srcLinesRest') = Prelude.splitAt (decLineNo - length srcLines) srcLinesRest
             let srcLines'' = srcLines ++ srcLines'
