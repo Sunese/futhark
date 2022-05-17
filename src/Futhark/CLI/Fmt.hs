@@ -12,6 +12,11 @@ import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, 
 import Language.Futhark.Parser.Lexer.Tokens
 import Prelude hiding (writeFile, unlines, lines)
 import System.Exit
+import Text.PrettyPrint.Mainland
+import qualified Text.PrettyPrint.Mainland as PP
+import Text.PrettyPrint.Mainland.Class
+import qualified Data.Text.Lazy as LT
+
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
@@ -57,6 +62,7 @@ format srcLines srcLinesRest decs comments = do
             let srcLines'' = srcLines ++ srcLines'
             format srcLines'' srcLinesRest' (tail decs) comments
 
+
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
 main = mainWithOptions () [] "program" $ \args () ->
@@ -64,11 +70,9 @@ main = mainWithOptions () [] "program" $ \args () ->
     [file] -> Just $ do
       s <- T.readFile file
       case parseWithComments file s of
-          (Left e, _) -> do
-            putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e 
-            putStrLn "File has not been changed."
-            exitWith $ ExitFailure 2
-          (Right Prog { progDoc = _, progDecs = decs }, comments) -> do
-            --Data.Text.IO.writeFile file $ format [] (lines s) decs comments
-            T.putStrLn $ format [] (lines s) decs comments
+        (Left e, _) -> do
+          exitWith $ ExitFailure 2
+        (Right prog, comments) -> do
+          --T.putStrLn $ prettyText prog
+          T.putStrLn $ LT.toStrict $ displayLazyText $ PP.render 200 $ ppr prog
     _ -> Nothing
