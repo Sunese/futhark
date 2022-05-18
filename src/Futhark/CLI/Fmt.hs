@@ -1,22 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | @futhark fmt@
 module Futhark.CLI.Fmt (main) where
 
-import Data.Text (Text, lines, unlines)
-import qualified Data.Text.IO as T
-import Futhark.Util.Loc
+import Data.Loc (Loc(..))
+import qualified Data.Text as T hiding (head, tail)
+import qualified Data.Text.IO as TIO
+import qualified Data.Text.Lazy as L
+import qualified Data.Text.Lazy.IO as LTIO
+import Futhark.Util.Loc hiding (SrcLoc)
 import Futhark.Util.Options ( mainWithOptions )
-import Language.Futhark
+import Language.Futhark hiding (pretty)
 import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, syntaxErrorLoc))
 import Language.Futhark.Parser.Lexer.Tokens
 import Prelude hiding (writeFile, unlines, lines)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import System.Exit
-import Text.PrettyPrint.Mainland
-import qualified Text.PrettyPrint.Mainland as PP
-import Text.PrettyPrint.Mainland.Class
-import qualified Data.Text.Lazy as LT
-
+import qualified Data.Set as Set
+import qualified Data.Map as Map
+import Data.Complex (Complex, realPart, imagPart)
+import Data.Ratio (Ratio(..), denominator, numerator)
+import Futhark.Util.Pretty
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
@@ -39,17 +46,17 @@ unpackDecEndLine dec = do
       case end of
         Pos _ line _ _ -> line
 
-format :: [Text] -> [Text] -> [UncheckedDec] -> [L Token] -> Text
+format :: [T.Text] -> [T.Text] -> [UncheckedDec] -> [L Token] -> T.Text
 format srcLines srcLinesRest decs comments = do
   case decs of
     [] -> do
       case comments of
-        [] -> unlines $ srcLines ++ srcLinesRest
+        [] -> T.unlines $ srcLines ++ srcLinesRest
         _ -> do -- no more decs, but still some comments, just consume the rest
-          unlines $ srcLines ++ srcLinesRest
+          T.unlines $ srcLines ++ srcLinesRest
     _ -> do
       case comments of
-        [] -> unlines $ srcLines ++ srcLinesRest -- no more comments, but still some decs, just consume the rest
+        [] -> T.unlines $ srcLines ++ srcLinesRest -- no more comments, but still some decs, just consume the rest
         _ -> do
           if locOf (head decs) > unpackTokLoc (head comments) then do
             let commentEndLine = unpackTokEndLine (head comments)
@@ -62,17 +69,18 @@ format srcLines srcLinesRest decs comments = do
             let srcLines'' = srcLines ++ srcLines'
             format srcLines'' srcLinesRest' (tail decs) comments
 
-
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
 main = mainWithOptions () [] "program" $ \args () ->
   case args of
     [file] -> Just $ do
-      s <- T.readFile file
+      s <- TIO.readFile file
       case parseWithComments file s of
         (Left e, _) -> do
           exitWith $ ExitFailure 2
         (Right prog, comments) -> do
-          --T.putStrLn $ prettyText prog
-          T.putStrLn $ LT.toStrict $ displayLazyText $ PP.render 200 $ ppr prog
+          --TIO.putStrLn $ prettyText prog
+          pprint prog
+          
     _ -> Nothing
+  
