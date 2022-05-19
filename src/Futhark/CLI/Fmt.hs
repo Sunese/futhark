@@ -23,7 +23,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Complex (Complex, realPart, imagPart)
 import Data.Ratio (Ratio(..), denominator, numerator)
-import Futhark.Util.Pretty
+import Futhark.Util.Pretty hiding (ppr)
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
@@ -80,7 +80,9 @@ main = mainWithOptions () [] "program" $ \args () ->
           exitWith $ ExitFailure 2
         (Right prog, comments) -> do
           --TIO.putStrLn $ prettyText prog
-          pprint prog
-          
+          putStrLn $ pretty prog
+          -- instance is in language/futhark/pretty.hs line no. 427
+          --print prog
+
     _ -> Nothing
   

@@ -472,7 +472,7 @@ instance (Eq vn, IsName vn, Annot f) => Pretty (ValBindBase f vn) where
       <+> align (sep (map ppr tparams ++ map ppr args))
       <> retdecl'
       <> text " ="
-      </> indent 2 (ppr body)
+      </> indent 0 (ppr body)
     where
       fun
         | isJust entry = "entry"
