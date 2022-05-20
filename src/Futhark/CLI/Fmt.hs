@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | @futhark fmt@
@@ -23,7 +24,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Data.Complex (Complex, realPart, imagPart)
 import Data.Ratio (Ratio(..), denominator, numerator)
-import Futhark.Util.Pretty hiding (ppr)
+import Futhark.Util.Pretty
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
@@ -37,6 +38,9 @@ unpackTokEndLine tok = do
         Loc _ end -> 
           case end of
             Pos _ line _ _ -> line
+
+unpackCommentString (L _ (COMMENT s)) = s
+unpackCommentString _ = error "unpackCommentString: not a comment"
 
 unpackDecEndLine :: UncheckedDec -> Int
 unpackDecEndLine dec = do
@@ -53,6 +57,7 @@ format srcLines srcLinesRest decs comments = do
       case comments of
         [] -> T.unlines $ srcLines ++ srcLinesRest
         _ -> do -- no more decs, but still some comments, just consume the rest
+          let srcLinesRest' = srcLines ++ [T.pack $ unpackCommentString $ head comments]
           T.unlines $ srcLines ++ srcLinesRest
     _ -> do
       case comments of
@@ -69,6 +74,32 @@ format srcLines srcLinesRest decs comments = do
             let srcLines'' = srcLines ++ srcLines'
             format srcLines'' srcLinesRest' (tail decs) comments
 
+hasCommentBefore :: UncheckedDec -> L Token -> Bool
+hasCommentBefore dec com = locOf dec > unpackTokLoc com
+
+-- check if there has been a comment before the dec 
+-- if so, just insert above the dec
+-- if there has not been a comment before, just do ppr dec
+flush :: [UncheckedDec] -> [L Token] -> [Doc] -> [Doc]
+flush decs comments doc = do
+  case decs of
+    [] -> doc -- TODO
+    _ -> do
+      case comments of
+        [] -> doc -- TODO
+        _ -> do
+          if hasCommentBefore (head decs) (head comments) then do 
+            flush (tail decs) (tail comments) (doc ++ [ppr (head decs)]) --TODO
+          else do 
+           doc -- TODO
+  
+
+
+
+ppr' :: [UncheckedDec] -> [L Token] -> Doc
+ppr' decs comments = stack . punctuate line . flush decs comments []
+   
+
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
 main = mainWithOptions () [] "program" $ \args () ->
@@ -79,10 +110,19 @@ main = mainWithOptions () [] "program" $ \args () ->
         (Left e, _) -> do
           exitWith $ ExitFailure 2
         (Right prog, comments) -> do
+        --(Right prog, comments) -> do
           --TIO.putStrLn $ prettyText prog
-          putStrLn $ pretty prog
+          case prog of 
+            Prog doc decs -> do
+              putStrLn $ pretty $ ppr doc <> ppr' decs
+              --TIO.putStrLn $ format (T.lines $ T.pack prog') [] decs comments
           -- instance is in language/futhark/pretty.hs line no. 427
           --print prog
+
+
+          -- 1st method: change up the ppr function/ or Pretty instances such that the instance that runs through CST also prints the comments
+          -- 2nd method: leave ppr/Pretty instances as is, and insert comments into ppr'd program
+          -- 1st method is preferred - fmt.go does it this way, and it's also more efficient
 
     _ -> Nothing
   

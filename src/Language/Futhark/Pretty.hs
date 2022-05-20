@@ -20,7 +20,7 @@ import Control.Monad
 import Data.Array
 import Data.Char (chr)
 import Data.Functor
-import Data.List (intersperse)
+import Data.List (intersperse, isSuffixOf)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -30,8 +30,11 @@ import Data.Word
 import Futhark.Util
 import Futhark.Util.Pretty
 import Language.Futhark.Prop
+    ( NoInfo, areTupleFields, leadingOperator )
 import Language.Futhark.Syntax
 import Prelude
+import Data.Text (take, takeEnd, pack, unpack, dropEnd)
+import Data.String
 
 -- | A class for types that are variable names in the Futhark source
 -- language.  This is used instead of a mere 'Pretty' instance because
@@ -453,6 +456,20 @@ instance Pretty Liftedness where
   ppr SizeLifted = text "~"
   ppr Lifted = text "^"
 
+docstring :: String -> Doc
+docstring ""         = line
+docstring ('\n' : s) = line <> text "-- " <> docstring s
+docstring s          = case span (/= '\n') s of
+                      (xs, ys) -> text xs <> docstring ys
+
+instance Pretty DocComment where
+  ppr (DocComment s _) = do
+    -- remove last newline to avoid misbehaviour
+    if "\n" `isSuffixOf` s then do
+      let s' = dropEnd 2 (pack s)
+      text "-- | " <> docstring (unpack s')
+    else text "-- | " <> docstring s
+
 instance (Eq vn, IsName vn, Annot f) => Pretty (TypeBindBase f vn) where
   ppr (TypeBind name l params te rt _ _) =
     text "type" <> ppr l <+> pprName name
@@ -471,8 +488,8 @@ instance (Eq vn, IsName vn, Annot f) => Pretty (ValBindBase f vn) where
       <+> pprName name
       <+> align (sep (map ppr tparams ++ map ppr args))
       <> retdecl'
-      <> text " ="
-      </> indent 0 (ppr body)
+      <> text " = "
+      <> ppr body
     where
       fun
         | isJust entry = "entry"
