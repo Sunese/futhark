@@ -20,6 +20,8 @@ import Language.Futhark.Parser.Lexer.Tokens
 import Prelude hiding (writeFile, unlines, lines)
 import System.Exit
 import Futhark.Util.Pretty
+import qualified Text.PrettyPrint.Mainland as PP
+import System.IO ( writeFile )
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
@@ -92,17 +94,7 @@ main = mainWithOptions () [] "program" $ \args () ->
           --TIO.putStrLn $ prettyText prog
           case prog of
             Prog doc decs -> do
-              putStrLn $ pretty $ ppr doc <> ppr' decs comments
-              --putStrLn $ pretty $ head $ flush decs comments []
-
-              --TIO.putStrLn $ format (T.lines $ T.pack prog') [] decs comments
-          -- instance is in language/futhark/pretty.hs line no. 427
-          --print prog
-
-
-          -- 1st method: change up the ppr function/ or Pretty instances such that the instance that runs through CST also prints the comments
-          -- 2nd method: leave ppr/Pretty instances as is, and insert comments into ppr'd program
-          -- 1st method is preferred - fmt.go does it this way, and it's also more efficient
-
+              writeFile ("fmt." ++ file) $ PP.pretty 20 $ ppr doc <> ppr' decs comments --write fmt to file
+              --putStrLn $ pretty $ ppr doc <> ppr' decs comments --write fmt to stdout
     _ -> Nothing
   
