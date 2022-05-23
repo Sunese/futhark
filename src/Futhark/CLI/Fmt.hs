@@ -64,14 +64,16 @@ docstring s = case span (/= '\n') s of
   (xs, ys) -> text xs <> docstring ys
 
 formatDoc :: Maybe DocComment -> Doc
-formatDoc m_dc = 
+formatDoc m_dc =
   case m_dc of
     Nothing -> mempty
-    Just (DocComment s loc) -> 
-      if "\n" `isSuffixOf` s then do
-        let s' = dropEnd 2 (pack s)
-        text "-- | " <> docstring (unpack s')
-      else text "-- | " <> docstring s -- remove last newline to avoid misbehaviour
+    Just (DocComment s loc) ->
+      -- remove last newline to avoid misbehaviour
+      if "\n" `isSuffixOf` s
+        then do
+          let s' = dropEnd 2 (pack s)
+          text "-- | " <> docstring (unpack s')
+        else text "-- | " <> docstring s
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
