@@ -1,83 +1,77 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 -- | @futhark fmt@
 module Futhark.CLI.Fmt (main) where
 
-import Data.Loc (Loc(..))
-import qualified Data.Text as T hiding (head, tail)
+import Data.List (isSuffixOf)
+import Data.Text (dropEnd, pack, unpack)
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy as L
-import qualified Data.Text.Lazy.IO as LTIO
 import Futhark.Util.Loc hiding (SrcLoc)
-import Futhark.Util.Options ( mainWithOptions )
-import Language.Futhark hiding (pretty)
-import Language.Futhark.Parser (parseWithComments, SyntaxError (syntaxErrorMsg, syntaxErrorLoc))
-import Language.Futhark.Parser.Lexer.Tokens
-import Prelude hiding (writeFile, unlines, lines)
-import System.Exit
+import Futhark.Util.Options (mainWithOptions)
 import Futhark.Util.Pretty
+import Language.Futhark hiding (pretty)
+import Language.Futhark.Parser (SyntaxError (syntaxErrorLoc, syntaxErrorMsg), parseWithComments)
+import Language.Futhark.Parser.Lexer.Tokens
+import System.IO (writeFile)
 import qualified Text.PrettyPrint.Mainland as PP
-import System.IO ( writeFile )
+import Prelude hiding (lines, unlines, writeFile)
+
 
 unpackTokLoc :: L Token -> Loc
 unpackTokLoc (L loc _) = loc
 
-unpackTokEndLine :: L Token -> Int
-unpackTokEndLine tok = do
-  case tok of 
-    L loc _ -> 
-      case loc of
-        NoLoc -> error "NoLoc"
-        Loc _ end -> 
-          case end of
-            Pos _ line _ _ -> line
-
+unpackCommentString :: L Token -> String
 unpackCommentString (L _ (COMMENT s)) = s
 unpackCommentString _ = error "unpackCommentString: not a comment"
 
 isLocatedBefore :: L Token -> UncheckedDec -> Bool
 isLocatedBefore comment dec = locOf dec > unpackTokLoc comment
 
--- check if there has been a comment before the dec 
--- if so, just insert above the dec
--- if there has not been a comment before, just do ppr dec
-flush :: [UncheckedDec] -> [L Token] -> [Doc] -> [Doc]
-flush decs comments doc = do
+fmt :: [UncheckedDec] -> [L Token] -> [Doc] -> [Doc]
+fmt decs comments doc = do
   case decs of
-    [] -> do -- no more decs, check if there are comments
-      case comments of
-        [] -> doc -- no decs and no comments, return constructed doc
-        _ -> do -- no decs, but some comments, append comment string and recurse
-          flush 
-              decs
-              (tail comments)
-              -- tmp doc ++ comment (reversed)
-              (doc ++ [text (unpackCommentString (head comments))])
-    _ -> do -- some decs, check if there are comments
-      case comments of
-        [] -> do -- no more comments, but still some decs, ppr curr dec and recurse
-          flush (tail decs) comments (doc ++ [ppr $ head decs])
-        _ -> do -- there are both decs and comments, check if commentbefore curr dec
-          if head comments `isLocatedBefore` head decs then do 
-            flush 
-              (tail decs) 
-              (tail comments)
-              -- tmp doc ++ comment ++ curr dec
-              (doc
-              ++ [string (unpackCommentString (head comments))]
-              ++ [ppr $ head decs])
-          else do -- no comment before current dec, ppr curr dec and recurse
-           flush 
-            (tail decs) 
-            comments 
-            (doc ++ [ppr $ head decs])
+    [] -> case comments of
+      [] -> doc
+      _ -> insertCommentAfter
+    _ -> case comments of
+      [] -> next
+      _ ->
+        if head comments `isLocatedBefore` head decs
+          then insertCommentBefore
+          else next
+  where
+    insertCommentAfter =
+      fmt
+        decs
+        (tail comments)
+        (doc ++ [text . unpackCommentString $ head comments])
+    insertCommentBefore =
+      fmt
+        (tail decs)
+        (tail comments)
+        (doc ++ [string . unpackCommentString $ head comments] ++ [ppr $ head decs])
+    next =
+      fmt
+        (tail decs)
+        comments
+        (doc ++ [ppr $ head decs])
 
-ppr' :: [UncheckedDec] -> [L Token] -> Doc
-ppr' decs comments = stack $ punctuate line $ flush decs comments []
+formatSource :: [UncheckedDec] -> [L Token] -> Doc
+formatSource decs comments = stack $ punctuate line $ fmt decs comments []
+
+docstring :: String -> Doc
+docstring "" = line
+docstring ('\n' : s) = line <> text "-- " <> docstring s
+docstring s = case span (/= '\n') s of
+  (xs, ys) -> text xs <> docstring ys
+
+formatDoc :: Maybe DocComment -> Doc
+formatDoc m_dc = 
+  case m_dc of
+    Nothing -> mempty
+    Just (DocComment s loc) -> 
+      if "\n" `isSuffixOf` s then do
+        let s' = dropEnd 2 (pack s)
+        text "-- | " <> docstring (unpack s')
+      else text "-- | " <> docstring s -- remove last newline to avoid misbehaviour
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
@@ -87,14 +81,13 @@ main = mainWithOptions () [] "program" $ \args () ->
       s <- TIO.readFile file
       case parseWithComments file s of
         (Left e, _) -> do
-          putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e 
+          putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e
           putStrLn "File has not been changed."
         (Right prog, comments) -> do
-        --(Right prog, comments) -> do
-          --TIO.putStrLn $ prettyText prog
+          -- (Right prog, comments) -> do
+          -- TIO.putStrLn $ prettyText prog
           case prog of
             Prog doc decs -> do
-              writeFile ("fmt." ++ file) $ PP.pretty 20 $ ppr doc <> ppr' decs comments --write fmt to file
-              --putStrLn $ pretty $ ppr doc <> ppr' decs comments --write fmt to stdout
+              writeFile ("fmt." ++ file) $ PP.prettyCompact $ formatDoc doc <> formatSource decs comments -- write fmt to file
+              -- putStrLn $ pretty $ ppr doc <> ppr' decs comments --write fmt to stdout
     _ -> Nothing
-  
