@@ -30,11 +30,11 @@ unpackCommentString _ = error "unpackCommentString: not a comment"
 isLocatedBefore :: L Token -> SrcLoc -> Bool
 isLocatedBefore comment sl = locOf sl > unpackTokLoc comment
 
-checkComment :: [L Token] -> SrcLoc -> Bool
-checkComment coms' sloc' = 
-  case coms' of 
-    [] -> False
-    _ -> head coms' `isLocatedBefore` sloc'
+unzipComs :: [(Int, L Token)] -> [L Token]
+unzipComs = map snd
+
+checkComment :: [(Int, L Token)] -> SrcLoc -> Bool
+checkComment coms' sloc' = head (unzipComs coms') `isLocatedBefore` sloc'
 
 prettyDocComment :: Maybe DocComment -> Doc
 prettyDocComment m_dc =
@@ -54,47 +54,42 @@ docstring ('\n' : s) = line <> text "-- " <> docstring s
 docstring s = case span (/= '\n') s of
   (xs, ys) -> text xs <> docstring ys
 
--- TODO: how do we avoid next dec to re-print comments from last dec's area?
-formatSource :: [UncheckedDec] -> [(Int, L Token)] -> Doc -> Doc
+formatSource :: [UncheckedDec] -> [L Token] -> Doc -> Doc
 formatSource decs coms doc =
   case decs of
     [] -> 
       case coms of
         [] -> doc
-        _ -> formatSource decs (tail coms) (doc </> (text . unpackCommentString $ head $ unzipComs coms))  --no more decs, but still some coms, consume rest
+        _ -> formatSource decs (tail coms) (doc </> (text . unpackCommentString $ head coms))  --no more decs, but still some coms, consume rest
     _ -> 
       case coms of
         [] -> formatSource (tail decs) coms (doc <> ppr (head decs) </> line) -- still some decs, but no coms, ppr rest
         _ -> do
-          let (decDoc, consumed) = formatDec $ head decs -- both coms and decs, run formatDec
-          formatSource (tail decs) (drop consumed coms) (doc </> decDoc </> line)
+          if head coms `isLocatedBefore` srclocOf (head decs) then
+            formatSource decs (tail coms) (doc </> (text . unpackCommentString $ head coms))
+          else do
+            let (decDoc, consumed) = formatDec (head decs) (zip [0..] coms)
+            formatSource (tail decs) (drop consumed coms) (doc </> line <> decDoc)
   where
-    -- check for comment here instead of inside each
-    formatDec dec = 
+    formatDec dec zipComs = 
       case dec of
-        ValDec dec' -> formatValBind dec' coms mempty
-        TypeDec dec' -> formatTypeBind dec' coms mempty
+        ValDec dec' -> formatValBind dec' zipComs
+        TypeDec dec' -> formatTypeBind dec' zipComs
         SigDec sig -> (ppr sig, 0)
         ModDec sd -> (ppr sd, 0)
         OpenDec x _ -> (text "open" <+> ppr x, 0)
-        LocalDec dec' _ -> (text "local" <+> ppr dec', 0)
+        LocalDec dec' _ -> do 
+          let (doc', consumed) = formatDec dec' zipComs
+          (text "local" <+> doc', consumed)
         ImportDec x _ _ -> (text "import" <+> dquotes (ppr x), 0)
 
-    unzipComs coms' = map snd coms'
+    formatValBind dec zipComs = do
+      let (expDoc, consumed) = constructExpDoc (bodyOf dec) zipComs mempty
+      (constructDocWithoutBody dec </> indent 2 expDoc, consumed)
 
-    formatValBind dec zipComs doc' = do
-      case zipComs of
-        [] -> (doc' </> line <> constructDocWithoutBody dec </> indent 2 (ppr (bodyOf dec)), 10000)
-        _ ->  if checkComment (unzipComs zipComs) (srclocOf dec) then do
-                let tmp = doc' <> (align . text . unpackCommentString $ head (unzipComs zipComs))
-                formatValBind dec (tail zipComs) tmp
-              else do
-                let (expDoc, consumed) = constructExpDoc (bodyOf dec) zipComs mempty
-                (doc' </> line <> constructDocWithoutBody dec </> indent 2 expDoc, consumed)
-
-    constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docComment attrs _) = 
+    constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) = 
       mconcat (map ((<> line) . ppr) attrs)
-        <> prettyDocComment docComment
+        <> prettyDocComment docCom
         <> text fun
         <+> pprName name
         <+> align (sep (map ppr tparams ++ map ppr args))
@@ -108,33 +103,21 @@ formatSource decs coms doc =
           Just rettype' -> colon <+> align rettype'
           Nothing -> mempty
 
-    formatTypeBind (TypeBind name l params te rt docComment sloc) zipComs doc' = do
-      case zipComs of
-        [] -> 
-          (prettyDocComment docComment <>
-          text "type" <> ppr l <+> pprName name
-          <+> spread (map ppr params)
-          <+> equals
-          <+> maybe (ppr te) ppr (unAnnot rt), 10000)
-        _ -> 
-          if checkComment (unzipComs zipComs) sloc then do
-            let tmp = doc' <> (align . text . unpackCommentString $ head (unzipComs zipComs))
-            formatTypeBind (TypeBind name l params te rt docComment sloc) (tail zipComs) tmp
-          else do
-            let (expDoc, consumed) = constructExpDoc te zipComs mempty
-            (prettyDocComment docComment <>
-              text "type" <> ppr l <+> pprName name
-              <+> spread (map ppr params)
-              <+> equals
-              </> indent 2 expDoc, consumed)
+    formatTypeBind (TypeBind name l params te _ docComment _) coms' = do
+      let (expDoc, consumed) = constructExpDoc te coms' mempty
+      (prettyDocComment docComment <>
+        text "type" <> ppr l <+> pprName name
+        <+> spread (map ppr params)
+        <+> equals
+        </> indent 2 expDoc, consumed)
 
-    constructExpDoc exp zipComs expDoc =
-      case zipComs of 
+    constructExpDoc exp coms' expDoc =
+      case coms' of 
         [] -> (expDoc </> ppr exp, 10000)
-        _ -> if checkComment (unzipComs zipComs) (srclocOf exp) then do
-          let tmpDoc = expDoc </> (align . text . unpackCommentString $ head $ unzipComs zipComs)
-          constructExpDoc exp (tail zipComs) tmpDoc
-        else (expDoc </> ppr exp, fst $ head zipComs)
+        _ ->  if checkComment coms' (srclocOf exp) then do
+                let tmpDoc = expDoc </> (align . text . unpackCommentString $ head $ unzipComs coms')
+                constructExpDoc exp (tail coms') tmpDoc
+              else (expDoc </> ppr exp, fst $ head coms')
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
@@ -154,6 +137,8 @@ main = mainWithOptions () [] "program" $ \args () ->
                 $ trim
                 $ PP.pretty 80 
                 $ prettyDocComment doc 
-                  <> formatSource decs (zip [0..] comments) mempty -- write fmt to file
+                  <> formatSource decs comments mempty -- write fmt to file
+              --print $ zip [0..] comments
+              --print $ (locOf $ srclocOf $ tail decs) > (unpackTokLoc $ comments!!2)
               --putStrLn $ PP.pretty 80 $ prettyDocComment doc <> prettySource decs comments --write fmt to stdout
     _ -> Nothing
