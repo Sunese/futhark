@@ -28,15 +28,15 @@ data CommentPosition
 
 data Comment = Comment  {
   commentString :: String,
-  commentSrcLoc :: SrcLoc,
+  commentSrcLoc :: Loc,
   commentPosition :: CommentPosition
 }
 
 bodyOf :: ValBindBase f vn -> ExpBase f vn
 bodyOf (ValBind _ _ _ _ _ _ body _ _ _) = body
 
-unpackTokSrcLoc :: L Token -> SrcLoc
-unpackTokSrcLoc (L loc _) = SrcLoc loc
+unpackTokSrcLoc :: L Token -> Loc
+unpackTokSrcLoc (L loc _) = loc
 
 unpackComTokString :: L Token -> String
 unpackComTokString (L _ (COMMENT s)) = s
@@ -46,7 +46,7 @@ unpackCommentString :: Comment -> String
 unpackCommentString = commentString
 
 isLocatedBefore :: Comment -> SrcLoc -> Bool
-isLocatedBefore (Comment _ sloc _) sl = sl > sloc
+isLocatedBefore (Comment _ loc _) sl = locOf sl > loc
 
 unzipComs :: [(Int, Comment)] -> [Comment]
 unzipComs = map snd
@@ -97,21 +97,21 @@ changeCommentPos (Comment string srcloc position) =
     else Comment string srcloc position
 
 formatSource :: [UncheckedDec] -> [Comment] -> [Doc] -> Doc
-formatSource decs coms doc =
+formatSource decs coms docs =
   case decs of
     [] -> 
       case coms of
-        [] -> stack doc -- we are done
-        _ -> formatSource decs (tail coms) (doc ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
+        [] -> stack docs -- we are done
+        _ -> formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
     _ -> 
       case coms of
-        [] -> formatSource (tail decs) coms (doc ++ [ppr (head decs)]) -- still some decs, but no coms, ppr rest
+        [] -> formatSource (tail decs) coms (docs ++ [ppr (head decs)]) -- still some decs, but no coms, ppr rest
         _ -> do
           if head coms `isLocatedBefore` srclocOf (head decs) then
-            formatSource decs (tail coms) (doc ++ [text . unpackCommentString $ head coms])
+            formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])
           else do
             let (decDoc, consumed) = formatDec (head decs) (zip [0..] coms)
-            formatSource (tail decs) (drop consumed coms) (doc ++ decDoc)
+            formatSource (tail decs) (drop consumed coms) (docs ++ decDoc)
   where
     formatDec :: UncheckedDec -> [(Int, Comment)] -> ([Doc], Int)
     formatDec dec zipComs = 
@@ -194,7 +194,10 @@ main = mainWithOptions () [] "program" $ \args () ->
           putStrLn "File has not been changed."
         (Right prog, comments) -> do
           case prog of
-            Prog doc decs ->
+            Prog doc decs -> do
+              -- let coms = prepareComments comments []
+              -- let b = head coms `isLocatedBefore` srclocOf (head decs)
+              -- print b
               --print $ head decs
               --writeFile file $ show $ head decs 
               writeFile ("fmt." ++ file)
