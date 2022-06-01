@@ -29,7 +29,8 @@ parseFuthark ::
   Either SyntaxError UncheckedProg
 parseFuthark = parse prog
 
---anden mulighed, lav en parsewothcomments her
+-- | Parse an entire Futhark program and return comments
+-- from token stream as well.
 parseWithComments ::
   FilePath ->
   T.Text ->
