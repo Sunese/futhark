@@ -28,12 +28,28 @@ data CommentPosition
 
 data Comment = Comment  {
   commentString :: String,
-  commentSrcLoc :: Loc,
+  commentLoc :: Loc,
   commentPosition :: CommentPosition
 }
 
+dropEnd1 :: [a] -> [a]
+dropEnd1 [] = []
+dropEnd1 (x:xs) = foldr (\z f y -> y : f z) (const []) xs x
+
 bodyOf :: ValBindBase f vn -> ExpBase f vn
 bodyOf (ValBind _ _ _ _ _ _ body _ _ _) = body
+
+startLineOfComment :: Comment -> Int
+startLineOfComment (Comment _ NoLoc _) = -1
+startLineOfComment (Comment _ (Loc pos _) _) = 
+  case pos of 
+    Pos _ line' _ _ -> line'
+
+startLineOfSrcLoc :: SrcLoc -> Int
+startLineOfSrcLoc (SrcLoc l) = 
+  case l of
+    NoLoc -> -1
+    Loc pos _ -> case pos of Pos _ line' _ _ -> line'
 
 unpackTokSrcLoc :: L Token -> Loc
 unpackTokSrcLoc (L loc _) = loc
@@ -96,40 +112,52 @@ changeCommentPos (Comment string srcloc position) =
     then Comment string srcloc OnTheSameLine
     else Comment string srcloc position
 
-formatSource :: [UncheckedDec] -> [Comment] -> [Doc] -> Doc
-formatSource decs coms docs =
-  case decs of
+insertComment :: Comment -> SrcLoc -> [Doc] -> [Doc]
+insertComment (Comment string loc position) sloc docs = 
+  if startLineOfSrcLoc sloc == startLineOfSrcLoc (srclocOf loc) then
+    -- append to doc at last entry of [Doc]
+    let doc = last docs
+        doc' = doc <+> text string
+    in dropEnd1 docs ++ [doc']
+  else
+    docs ++ [text string]
+
+
+formatSource :: [UncheckedDec] -> [Comment] -> [Doc] -> SrcLoc -> Doc
+formatSource decsQueue coms docs lastSrcLoc =
+  case decsQueue of
     [] -> 
       case coms of
         [] -> stack docs -- we are done
-        _ -> formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
+        _ -> formatSource decsQueue (tail coms) (insertComment (head coms) lastSrcLoc docs) lastSrcLoc
+          --formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
     _ -> 
       case coms of
-        [] -> formatSource (tail decs) coms (docs ++ [ppr (head decs)]) -- still some decs, but no coms, ppr rest
+        [] -> formatSource (tail decsQueue) coms (docs ++ [ppr (head decsQueue)]) lastSrcLoc -- still some decs, but no coms, ppr rest
         _ -> do
-          if head coms `isLocatedBefore` srclocOf (head decs) then
-            formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])
+          if head coms `isLocatedBefore` srclocOf (head decsQueue) then
+            formatSource decsQueue (tail coms) (docs ++ [text . unpackCommentString $ head coms]) lastSrcLoc
           else do
-            let (decDoc, consumed) = formatDec (head decs) (zip [0..] coms)
-            formatSource (tail decs) (drop consumed coms) (docs ++ decDoc)
+            let (decDoc, consumed, lastSrcLoc') = formatDec (head decsQueue) (zip [0..] coms)
+            formatSource (tail decsQueue) (drop consumed coms) (docs ++ decDoc) lastSrcLoc'
   where
-    formatDec :: UncheckedDec -> [(Int, Comment)] -> ([Doc], Int)
+    formatDec :: UncheckedDec -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
     formatDec dec zipComs = 
       case dec of
         ValDec dec' -> formatValBind dec' zipComs
         TypeDec dec' -> formatTypeBind dec' zipComs
-        SigDec sig -> ([ppr sig], 0)
-        ModDec sd -> ([ppr sd], 0)
-        OpenDec x _ -> ([text "open" <+> ppr x], 0)
+        SigDec sig -> ([ppr sig], 0, srclocOf sig)
+        ModDec sd -> ([ppr sd], 0, srclocOf sd)
+        OpenDec x _ -> ([text "open" <+> ppr x], 0, srclocOf x)
         LocalDec dec' _ -> do 
-          let (doc', consumed) = formatDec dec' zipComs
-          (text "local" <+> head doc' : tail doc', consumed)
-        ImportDec x _ _ -> ([text "import" <+> dquotes (ppr x)], 0)
+          let (doc', consumed, lastSrcLoc) = formatDec dec' zipComs
+          (text "local" <+> head doc' : tail doc', consumed, srclocOf dec')
+        ImportDec x _ _ -> ([text "import" <+> dquotes (ppr x)], 0, srclocOf dec)
 
-    formatValBind :: ValBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int)
+    formatValBind :: ValBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
     formatValBind dec zipComs = do
-      let (expDoc, consumed) = constructExpDoc (bodyOf dec) zipComs
-      (constructDocWithoutBody dec : map (indent 2) expDoc, consumed)
+      let (expDoc, consumed, lastSrcLoc) = constructExpDoc (bodyOf dec) zipComs
+      (constructDocWithoutBody dec : map (indent 2) expDoc, consumed, lastSrcLoc)
 
     constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) = 
       mconcat (map ((<> line) . ppr) attrs)
@@ -147,18 +175,18 @@ formatSource decs coms docs =
           Just rettype' -> colon <+> align rettype'
           Nothing -> mempty
 
-    formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int)
+    formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
     formatTypeBind (TypeBind name l params te _ docComment _) coms' = do
-      let (expDoc, consumed) = constructTypeExpDoc te coms' mempty
+      let (expDoc, consumed) = constructTypeExpDoc te coms' []
       (prettyDocComment docComment :
         text "type" <> ppr l <+> pprName name
         <+> spread (map ppr params)
         <+> equals
-        : map (indent 2) expDoc, consumed)
+        : map (indent 2) expDoc, consumed, srclocOf te)
 
-    constructExpDoc :: ExpBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int)
+    constructExpDoc :: ExpBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
     constructExpDoc exp coms' = do
-      let (comsDoc, consumed) = genComsDoc coms' (srclocOf exp) mempty
+      let (comsDoc, consumed) = genComsDoc coms' (srclocOf exp) []
       case exp of 
         -- sloc of exp and sloc of each AppExp is the same
         Parens e _ -> constructExpDoc e (drop consumed coms')
@@ -166,12 +194,12 @@ formatSource decs coms docs =
           case e of
             DoLoop _ _ _ _ _ sloc -> do
               let (comsDoc', consumed') = genComsDoc (drop consumed coms') sloc []
-              (comsDoc ++  comsDoc' ++ [ppr exp], consumed')
+              (comsDoc ++  comsDoc' ++ [ppr exp], consumed', srclocOf e)
             LetPat _ _ _ body _ -> do
               let (comsDoc', consumed') = genComsDoc (drop consumed coms') (srclocOf body) []
-              (comsDoc ++ comsDoc' ++ [ppr exp], consumed')
-            _ -> (comsDoc ++ [ppr exp], consumed)
-        _ -> (comsDoc ++ [ppr exp], consumed)
+              (comsDoc ++ comsDoc' ++ [ppr exp], consumed', srclocOf e)
+            _ -> (comsDoc ++ [ppr exp], consumed, srclocOf e)
+        _ -> (comsDoc ++ [ppr exp], consumed, srclocOf exp)
 
     constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int)
     constructTypeExpDoc exp coms' expDoc =
@@ -200,11 +228,11 @@ main = mainWithOptions () [] "program" $ \args () ->
               -- print b
               --print $ head decs
               --writeFile file $ show $ head decs 
-              writeFile ("fmt." ++ file)
+              writeFile file
               $ trim
               $ PP.pretty 80 
               $ prettyDocComment doc 
-              </> formatSource decs (prepareComments comments []) [] -- write fmt to file
+              </> formatSource decs (prepareComments comments []) [] (srclocOf $ last decs)  -- write fmt to file
               --print $ zip [0..] comments
               --print $ (locOf $ srclocOf $ tail decs) > (unpackTokLoc $ comments!!2)
               --putStrLn $ PP.pretty 80 $ prettyDocComment doc <> prettySource decs comments --write fmt to stdout
