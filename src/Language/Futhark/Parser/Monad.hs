@@ -99,7 +99,7 @@ mustBeEmpty loc t =
 data ParserState = ParserState
   { _parserFile :: FilePath,
     parserInput :: T.Text,
-    parserLexical :: ([L Token], [L Token], Pos) --liste af kommentater her
+    parserLexical :: ([L Token], [L Token], Pos)
   }
 
 type ParserMonad = ExceptT SyntaxError (StateT ParserState ReadLineMonad)
@@ -233,10 +233,9 @@ lexer cont = do
         Right x -> pure x
         Left parse_e -> do
           line <- readLine
-          ts' <-
-            case line of
-              Nothing -> throwError parse_e
-              Just line' -> pure $ scanTokensText (advancePos pos '\n') line' -- i think scanTokens in Lexer.x needs to put comment in list
+          ts' <- case line of
+                  Nothing -> throwError parse_e
+                  Just line' -> pure $ scanTokensText (advancePos pos '\n') line'
           (ts'', _, pos') <- either (throwError . lexerErrToParseErr) pure ts'
           case ts'' of
             [] -> cont $ eof pos
