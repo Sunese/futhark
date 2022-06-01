@@ -190,7 +190,7 @@ getTokens :: ParserMonad ([L Token], [L Token], Pos)
 getTokens = lift $ gets parserLexical
 
 putTokens :: ([L Token], [L Token ], Pos) -> ParserMonad ()
-putTokens l = lift $ modify $ \env -> env {parserLexical = l} --brug denne til at smide i liste med kommentarer
+putTokens l = lift $ modify $ \env -> env {parserLexical = l}
 
 primTypeFromName :: Loc -> Name -> ParserMonad PrimType
 primTypeFromName loc s = maybe boom pure $ M.lookup s namesToPrimTypes
