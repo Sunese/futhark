@@ -211,10 +211,10 @@ formatValBind dec zipComs tmpDoc = do
         retdecl' = case (ppr <$> unAnnot rettype) `mplus` (ppr <$> retdecl) of
           Just rettype' -> colon <+> align rettype'
           Nothing -> mempty
-        maybeSplitUpArgs = if totalLengthOfArgs < 96
+        maybeSplitUpArgs = if totalLengthOfArgs < 80
                         then sep (map ppr tparams ++ map ppr args)
                         else line <> stack (map (indent 2 . ppr) tparams ++ map (indent 2 . ppr) args)
-        indentation = if totalLengthOfArgs < 96 then indent 2 else indent 4
+        indentation = if totalLengthOfArgs < 80 then indent 2 else indent 4
         totalLengthOfArgs = sum (map lengthof args) + length args * 2 + length (prettyName name) + 4
           where
             lengthof arg = endColOfLoc (locOf arg) - startColOfLoc (locOf arg)
