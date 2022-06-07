@@ -57,6 +57,23 @@ startLineOfSrcLoc (SrcLoc l) =
     NoLoc -> -1
     Loc pos _ -> case pos of Pos _ line' _ _ -> line'
 
+endColOfSrcLoc :: SrcLoc -> Int
+endColOfSrcLoc (SrcLoc l) = 
+  case l of
+    NoLoc -> -1
+    Loc _ pos -> case pos of Pos _ _ col _ -> col
+
+endColOfLoc :: Loc -> Int
+endColOfLoc (Loc _ pos) = 
+  case pos of Pos _ _ col _ -> col
+endColOfLoc NoLoc = -1
+
+startLineOfLoc :: Loc -> Int
+startLineOfLoc (Loc pos _) = 
+  case pos of 
+    Pos _ line' _ _ -> line'
+startLineOfLoc _ = -1
+
 unpackTokSrcLoc :: L Token -> Loc
 unpackTokSrcLoc (L loc _) = loc
 
@@ -144,7 +161,9 @@ formatSource decs coms tmpDoc lastSrcLoc =
           --formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
     _ -> 
       case coms of
-        [] -> formatSource (tail decs) coms (tmpDoc ++ [ppr (head decs)]) lastSrcLoc -- still some decs, but no coms, ppr rest
+        [] -> let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) [] tmpDoc
+              in formatSource (tail decs) [] (tmpDoc ++ decDoc) lastSrcLoc'
+           --formatSource (tail decs) coms (tmpDoc ++ [ppr (head decs)]) lastSrcLoc -- still some decs, but no coms, ppr rest
         _ -> do
           if head coms `isLocatedBefore` srclocOf (head decs) then
             formatSource decs (tail coms) (tmpDoc ++ [text . unpackCommentString $ head coms]) lastSrcLoc
@@ -168,16 +187,16 @@ formatDec dec zipComs tmpDoc =
 formatValBind :: (Eq vn, IsName vn, Annot f) => ValBindBase f vn -> [(Int, Comment)] -> [Doc] -> ([Doc], Int, SrcLoc)
 formatValBind dec zipComs tmpDoc = do
   let (expDoc, consumed, lastSrcLoc) = formatExpBase (bodyOf dec) zipComs tmpDoc $ srclocOf dec
-  (constructDocWithoutBody dec : map (indent 2) expDoc, consumed, lastSrcLoc)
+  (constructDocWithoutBody dec expDoc, consumed, lastSrcLoc)
   where
-    constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) = 
+    constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) expDoc = 
       mconcat (map ((<> line) . ppr) attrs)
         <> prettyDocComment docCom
         <> text fun
         <+> pprName name
-        <+> align (sep (map ppr tparams ++ map ppr args))
+        <+> align maybeSplitUpArgs
         <> retdecl'
-        <> text " = "
+        <> text " = " : map indentation expDoc
       where
         fun
           | isJust entry = "entry"
@@ -185,6 +204,10 @@ formatValBind dec zipComs tmpDoc = do
         retdecl' = case (ppr <$> unAnnot rettype) `mplus` (ppr <$> retdecl) of
           Just rettype' -> colon <+> align rettype'
           Nothing -> mempty
+        maybeSplitUpArgs = if endColOfLoc (locOf $ last args) < 96
+                        then sep (map ppr tparams ++ map ppr args)
+                        else line <> stack (map (indent 2 . ppr) tparams ++ map (indent 2 . ppr) args)
+        indentation = if startLineOfLoc (locOf dec) == startLineOfLoc (locOf $ last args) then indent 2 else indent 4
 
 formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
 formatTypeBind (TypeBind name l params te _ docComment _) coms' = do
@@ -207,22 +230,20 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
           (docBeforeExp ++  comsDoc' ++ [ppr exp], consumed', srclocOf e)
         LetPat sizes pat e' body srcloc -> do
           let (commentsBeforeBody, consumedBeforeBody) = commentsBefore (drop consumed zipComs) srcloc lastSrcLoc docBeforeExp False
-          let expDocWithoutBody = align $
-                    text "let" <+> spread (map ppr sizes) <+> align (ppr pat)
-                      <+> ( if linebreak
-                              then equals </> indent 2 (ppr e')
-                              else equals <+> align (ppr e')
-                          )
+          let expDocWithoutBody = firstpat --[align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <> space] 
                     where 
                       linebreak = case e' of
                         AppExp {} -> True
                         Attr {} -> True
                         ArrayLit {} -> False
                         _ -> hasArrayLit e'
-          let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumedBeforeBody zipComs) (commentsBeforeBody ++ [expDocWithoutBody]) srcloc
-          (commentsBeforeBody ++ bodyDoc, consumedAfterBody, srcLocOfLastLine)
-        _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf e)
-    _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)
+                      firstpat = if linebreak
+                              then align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : [indent 2 (ppr e')]
+                              else [align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals <+> align (ppr e')]
+          let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumedBeforeBody zipComs) (commentsBeforeBody ++ expDocWithoutBody) srcloc
+          (commentsBeforeBody ++ bodyDoc, consumedAfterBody, srcLocOfLastLine) -- doesnt affect summation 
+        _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf e)-- doesnt affect summation 
+    _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)-- doesnt affect summation 
 
 letBody :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 letBody body@(AppExp LetPat {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
@@ -230,7 +251,7 @@ letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfBody = formatExpBase bo
 letBody body zipComs tmpDoc lastsrcloc = do
     let (commentsBeforeBody, consumed) = commentsBefore zipComs (srclocOf body) lastsrcloc tmpDoc False
     let bodyDoc = [text "in" <+> align (ppr body)]
-    (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body)
+    (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body) -- doesnt affect
 
 constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int)
 constructTypeExpDoc exp coms' expDoc =
