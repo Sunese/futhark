@@ -18,6 +18,7 @@ import System.IO (writeFile)
 import qualified Text.PrettyPrint.Mainland as PP
 import Prelude hiding (exp, lines, unlines, writeFile)
 import Futhark.Util.Pretty (srcloc)
+import CMarkGFM (PosInfo(startColumn))
 
 -- | Modes for rendering of pending comments.
 data CommentPosition
@@ -67,6 +68,11 @@ endColOfLoc :: Loc -> Int
 endColOfLoc (Loc _ pos) = 
   case pos of Pos _ _ col _ -> col
 endColOfLoc NoLoc = -1
+
+startColOfLoc :: Loc -> Int
+startColOfLoc (Loc pos _) = 
+  case pos of Pos _ _ col _ -> col
+startColOfLoc NoLoc = -1
 
 startLineOfLoc :: Loc -> Int
 startLineOfLoc (Loc pos _) = 
@@ -189,6 +195,7 @@ formatValBind dec zipComs tmpDoc = do
   let (expDoc, consumed, lastSrcLoc) = formatExpBase (bodyOf dec) zipComs tmpDoc $ srclocOf dec
   (constructDocWithoutBody dec expDoc, consumed, lastSrcLoc)
   where
+    constructDocWithoutBody :: (Eq vn, IsName vn, Annot f) => ValBindBase f vn -> [Doc] -> [Doc]
     constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) expDoc = 
       mconcat (map ((<> line) . ppr) attrs)
         <> prettyDocComment docCom
@@ -204,10 +211,13 @@ formatValBind dec zipComs tmpDoc = do
         retdecl' = case (ppr <$> unAnnot rettype) `mplus` (ppr <$> retdecl) of
           Just rettype' -> colon <+> align rettype'
           Nothing -> mempty
-        maybeSplitUpArgs = if endColOfLoc (locOf $ last args) < 96
+        maybeSplitUpArgs = if totalLengthOfArgs < 96
                         then sep (map ppr tparams ++ map ppr args)
                         else line <> stack (map (indent 2 . ppr) tparams ++ map (indent 2 . ppr) args)
-        indentation = if startLineOfLoc (locOf dec) == startLineOfLoc (locOf $ last args) then indent 2 else indent 4
+        indentation = if totalLengthOfArgs < 96 then indent 2 else indent 4
+        totalLengthOfArgs = sum (map lengthof args) + length args * 2 + length (prettyName name) + 4
+          where
+            lengthof arg = endColOfLoc (locOf arg) - startColOfLoc (locOf arg)
 
 formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
 formatTypeBind (TypeBind name l params te _ docComment _) coms' = do
@@ -287,6 +297,22 @@ main = mainWithOptions () [] "program" $ \args () ->
                 </> formatSource decs (prepareComments comments []) [] (srclocOf $ last decs) -- write fmt to file
 
               writeFile ("tree." ++ file) $ show $ head decs
+              -- case decs of
+              --   [] -> pure ()
+              --   db : dbs -> case db of
+              --     ValDec vbb -> case vbb of
+              --       ValBind m_ni na m_te ni tpbs pbs eb m_dc ais sl -> case pbs of
+              --         [] -> pure ()
+              --         pb : pbs' -> do 
+              --           print $ endColOfLoc (locOf pb)
+              --           print $ startColOfLoc (locOf pb)
+              --     TypeDec tbb -> pure ()
+              --     SigDec sbb -> pure ()
+              --     ModDec mbb -> pure ()
+              --     OpenDec meb sl -> pure ()
+              --     LocalDec db' sl -> pure ()
+              --     ImportDec str ni sl -> pure ()
+
               --print $ zip [0..] comments
               --print $ (locOf $ srclocOf $ tail decs) > (unpackTokLoc $ comments!!2)
               --putStrLn $ PP.pretty 80 $ prettyDocComment doc <> prettySource decs comments --write fmt to stdout
