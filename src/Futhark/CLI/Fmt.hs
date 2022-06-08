@@ -28,6 +28,7 @@ data CommentPosition
     OnNextLine
   deriving (Eq, Show)
 
+-- TODO: commentloc and commentposition not used?
 data Comment = Comment  {
   commentString :: String,
   commentLoc :: Loc,
@@ -105,6 +106,7 @@ prettyDocComment m_dc =
     Nothing -> mempty
     Just (DocComment s _) ->
       -- remove last newline to avoid misbehaviour
+      -- TODO: avoid dropEnd
       if "\n" `isSuffixOf` s
         then do
           let s' = dropEnd 2 (pack s)
@@ -128,9 +130,9 @@ commentsBefore comments sloc lastSrcLoc tmpDocs inserted =
               (tail comments)
               sloc 
               lastSrcLoc
-              (insertComment (snd $ head comments) lastSrcLoc tmpDocs) -- will insert comment at the right place
+              (insertComment (snd $ head comments) lastSrcLoc tmpDocs)
               True
-      else -- no comment before, but still some left - figure out if some were inserted and needs to be dropped later
+      else 
         if inserted then (tmpDocs, fst $ head comments)
         else (tmpDocs, 0)
 
@@ -149,12 +151,10 @@ changeCommentPos (Comment string srcloc position) =
 insertComment :: Comment -> SrcLoc -> [Doc] -> [Doc]
 insertComment (Comment commentstring commentloc _) sloc docs = 
   if startLineOfSrcLoc sloc == startLineOfSrcLoc (srclocOf commentloc) then
-    -- append to doc at last entry of [Doc]
     let doc = last docs
         doc' = doc <+> text commentstring
     in dropEnd1 docs ++ [doc']
   else
-    -- otherwise put comment on new line
     docs ++ [text commentstring]
 
 formatSource :: [UncheckedDec] -> [Comment] -> [Doc] -> SrcLoc -> Doc
@@ -162,14 +162,12 @@ formatSource decs coms tmpDoc lastSrcLoc =
   case decs of
     [] -> 
       case coms of
-        [] -> stack tmpDoc -- we are done
+        [] -> stack tmpDoc
         _ -> formatSource decs (tail coms) (insertComment (head coms) lastSrcLoc tmpDoc) lastSrcLoc
-          --formatSource decs (tail coms) (docs ++ [text . unpackCommentString $ head coms])  --no more decs, but still some coms, consume rest
     _ -> 
       case coms of
         [] -> let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) [] tmpDoc
               in formatSource (tail decs) [] (tmpDoc ++ decDoc) lastSrcLoc'
-           --formatSource (tail decs) coms (tmpDoc ++ [ppr (head decs)]) lastSrcLoc -- still some decs, but no coms, ppr rest
         _ -> do
           if head coms `isLocatedBefore` srclocOf (head decs) then
             formatSource decs (tail coms) (tmpDoc ++ [text . unpackCommentString $ head coms]) lastSrcLoc
@@ -240,7 +238,7 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
           (docBeforeExp ++  comsDoc' ++ [ppr exp], consumed', srclocOf e)
         LetPat sizes pat e' body srcloc -> do
           let (commentsBeforeBody, consumedBeforeBody) = commentsBefore (drop consumed zipComs) srcloc lastSrcLoc docBeforeExp False
-          let expDocWithoutBody = firstpat --[align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <> space] 
+          let expDocWithoutBody = firstpat
                     where 
                       linebreak = case e' of
                         AppExp {} -> True
@@ -251,9 +249,9 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
                               then align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : [indent 2 (ppr e')]
                               else [align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals <+> align (ppr e')]
           let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumedBeforeBody zipComs) (commentsBeforeBody ++ expDocWithoutBody) srcloc
-          (commentsBeforeBody ++ bodyDoc, consumedAfterBody, srcLocOfLastLine) -- doesnt affect summation 
-        _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf e)-- doesnt affect summation 
-    _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)-- doesnt affect summation 
+          (commentsBeforeBody ++ bodyDoc, consumedAfterBody, srcLocOfLastLine) 
+        _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf e)
+    _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)
 
 letBody :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 letBody body@(AppExp LetPat {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
@@ -261,7 +259,7 @@ letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfBody = formatExpBase bo
 letBody body zipComs tmpDoc lastsrcloc = do
     let (commentsBeforeBody, consumed) = commentsBefore zipComs (srclocOf body) lastsrcloc tmpDoc False
     let bodyDoc = [text "in" <+> align (ppr body)]
-    (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body) -- doesnt affect
+    (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body) 
 
 constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int)
 constructTypeExpDoc exp coms' expDoc =
@@ -285,35 +283,13 @@ main = mainWithOptions () [] "program" $ \args () ->
         (Right prog, comments) -> do
           case prog of
             Prog doc decs -> do
-              -- let coms = prepareComments comments []
-              -- let b = head coms `isLocatedBefore` srclocOf (head decs)
-              -- print b
-              --print $ head decs
-              --writeFile file $ show $ head decs
               writeFile ("fmt." ++ file)
                 $ trim
                 $ PP.prettyCompact
                 $ prettyDocComment doc 
-                </> formatSource decs (prepareComments comments []) [] (srclocOf $ last decs) -- write fmt to file
-
-              writeFile ("tree." ++ file) $ show $ head decs
-              -- case decs of
-              --   [] -> pure ()
-              --   db : dbs -> case db of
-              --     ValDec vbb -> case vbb of
-              --       ValBind m_ni na m_te ni tpbs pbs eb m_dc ais sl -> case pbs of
-              --         [] -> pure ()
-              --         pb : pbs' -> do 
-              --           print $ endColOfLoc (locOf pb)
-              --           print $ startColOfLoc (locOf pb)
-              --     TypeDec tbb -> pure ()
-              --     SigDec sbb -> pure ()
-              --     ModDec mbb -> pure ()
-              --     OpenDec meb sl -> pure ()
-              --     LocalDec db' sl -> pure ()
-              --     ImportDec str ni sl -> pure ()
-
-              --print $ zip [0..] comments
-              --print $ (locOf $ srclocOf $ tail decs) > (unpackTokLoc $ comments!!2)
-              --putStrLn $ PP.pretty 80 $ prettyDocComment doc <> prettySource decs comments --write fmt to stdout
+                </> formatSource 
+                  decs 
+                  (prepareComments comments []) 
+                  [] 
+                  (srclocOf $ last decs)
     _ -> Nothing
