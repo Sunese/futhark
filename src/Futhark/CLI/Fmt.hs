@@ -19,6 +19,7 @@ import qualified Text.PrettyPrint.Mainland as PP
 import Prelude hiding (exp, lines, unlines, writeFile)
 import Futhark.Util.Pretty (srcloc)
 import CMarkGFM (PosInfo(startColumn))
+import qualified Text.PrettyPrint.Mainland as TIO
 
 -- | Modes for rendering of pending comments.
 data CommentPosition
@@ -280,16 +281,28 @@ main = mainWithOptions () [] "program" $ \args () ->
         (Left e, _) -> do
           putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e
           putStrLn "File has not been changed."
-        (Right prog, comments) -> do
-          case prog of
+        (Right prog1, comments1) -> do
+          case prog1 of
             Prog doc decs -> do
-              writeFile ("fmt." ++ file)
-                $ trim
-                $ PP.prettyCompact
-                $ prettyDocComment doc 
-                </> formatSource 
-                  decs 
-                  (prepareComments comments []) 
-                  [] 
-                  (srclocOf $ last decs)
+              let formattedText =
+                      pack
+                      $ trim
+                      $ PP.prettyCompact
+                      $ prettyDocComment doc 
+                      </> formatSource 
+                        decs 
+                        (prepareComments comments1 []) 
+                        [] 
+                        (srclocOf $ last decs)
+              case parseWithComments file formattedText of
+                (Left e, _) -> do
+                  putStr $ "Reformatting led to syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e
+                  putStrLn "File has not been changed."
+                (Right prog2, comments2) -> do
+                  if prog1 == prog2 then
+                    putStrLn "Syntax trees after reformatting are equal!"
+                  else putStrLn "Syntax trees are NOT equal after reformatting!"
+              -- writeFile ("fmt." ++ file)
+              -- first reformat and see if syntax tree is the same
+              -- check for idempotence afterwards, it's not as important
     _ -> Nothing
