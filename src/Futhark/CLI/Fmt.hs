@@ -138,6 +138,15 @@ commentsBefore comments sloc lastSrcLoc tmpDocs inserted =
             then (tmpDocs, fst $ head comments)
             else (tmpDocs, 0)
 
+insertComment :: Comment -> SrcLoc -> [Doc] -> [Doc]
+insertComment (Comment commentstring commentloc _) sloc docs =
+  if startLineOfSrcLoc sloc == startLineOfSrcLoc (srclocOf commentloc)
+    then
+      let doc = last docs
+          doc' = doc <+> text commentstring
+       in dropEnd1 docs ++ [doc']
+    else docs ++ [text commentstring]
+
 prepareComments :: [L Token] -> [Comment] -> [Comment]
 prepareComments tokens coms =
   case tokens of
@@ -150,15 +159,6 @@ changeCommentPos (Comment string srcloc position) =
     then Comment string srcloc OnTheSameLine
     else Comment string srcloc position
 
-insertComment :: Comment -> SrcLoc -> [Doc] -> [Doc]
-insertComment (Comment commentstring commentloc _) sloc docs =
-  if startLineOfSrcLoc sloc == startLineOfSrcLoc (srclocOf commentloc)
-    then
-      let doc = last docs
-          doc' = doc <+> text commentstring
-       in dropEnd1 docs ++ [doc']
-    else docs ++ [text commentstring]
-
 formatSource :: [UncheckedDec] -> [Comment] -> [Doc] -> SrcLoc -> Doc
 formatSource decs coms tmpDoc lastSrcLoc =
   case decs of
@@ -168,13 +168,14 @@ formatSource decs coms tmpDoc lastSrcLoc =
         _ -> formatSource decs (tail coms) (insertComment (head coms) lastSrcLoc tmpDoc) lastSrcLoc
     _ ->
       case coms of
-        [] ->
-          let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) [] tmpDoc
-           in formatSource (tail decs) [] (tmpDoc ++ decDoc) lastSrcLoc'
+        [] -> do
+          let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) [] mempty
+          formatSource (tail decs) [] (tmpDoc ++ decDoc) lastSrcLoc'
         _ -> do
           if head coms `isLocatedBefore` srclocOf (head decs)
             then formatSource decs (tail coms) (tmpDoc ++ [text . unpackCommentString $ head coms]) lastSrcLoc
             else do
+              --stack $ map (text . unpackCommentString) coms
               let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) (zip [1 ..] coms) tmpDoc
               formatSource (tail decs) (drop consumed coms) (tmpDoc ++ decDoc) lastSrcLoc'
 
@@ -238,14 +239,13 @@ formatExpBase :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)]
 formatExpBase exp zipComs tmpDoc lastSrcLoc = do
   let (docBeforeExp, consumed) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
   case exp of
-    Parens e srcloc -> formatExpBase e (drop consumed zipComs) tmpDoc srcloc
+    Parens e srcloc' -> (docBeforeExp ++ [align $ parens $ ppr e], consumed, srcloc')
     AppExp e _ -> do
       case e of
         DoLoop _ _ _ _ _ sloc -> do
-          let (comsDoc', consumed') = commentsBefore (drop consumed zipComs) sloc lastSrcLoc tmpDoc False
+          let (comsDoc', consumed') = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
           (docBeforeExp ++ comsDoc' ++ [ppr exp], consumed', srclocOf e)
-        LetPat sizes pat e' body srcloc -> do
-          let (commentsBeforeBody, consumedBeforeBody) = commentsBefore (drop consumed zipComs) srcloc lastSrcLoc docBeforeExp False
+        LetPat sizes pat e' body srcloc' -> do
           let expDocWithoutBody = firstpat
                 where
                   linebreak = case e' of
@@ -257,16 +257,30 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
                     if linebreak
                       then align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : [indent 2 (ppr e')]
                       else [align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals <+> align (ppr e')]
-          let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumedBeforeBody zipComs) (commentsBeforeBody ++ expDocWithoutBody) srcloc
-          (commentsBeforeBody ++ bodyDoc, consumedAfterBody, srcLocOfLastLine)
-        _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf e)
+          let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumed zipComs) expDocWithoutBody srcloc'
+          (docBeforeExp ++ bodyDoc, consumedAfterBody, srcLocOfLastLine)
+        If c t f sloc -> do
+          let ifDoc = [text "if" <+> ppr c]
+          let thenDoc = [text "then" <+> align (ppr t)]
+          
+          let (docbeforeif, consumedif) = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
+          let (docbeforethen, consumedthen) = commentsBefore (drop consumedif zipComs) (srclocOf t) sloc (docbeforeif ++ ifDoc) False
+          let (docbeforeelse, consumedelse) = commentsBefore (drop consumedthen zipComs) (srclocOf f) sloc (docbeforethen ++ thenDoc) False
+
+          let (elseDoc, consumedfinal, lastsrcloc) = formatExpBase f (drop consumedelse zipComs) (docbeforeelse ++ [text "else" <+> align (ppr f)]) (srclocOf f)
+          (elseDoc, consumedfinal, lastsrcloc)
+        _ -> do
+          let (commentsBeforeExp, consumed') = commentsBefore (drop consumed zipComs) (srclocOf e) lastSrcLoc docBeforeExp False
+          --(commentsBeforeExp ++ [ppr exp], consumed', srclocOf e)
+          --(docBeforeExp, consumed', srclocOf e)
+          (commentsBeforeExp ++ [ppr e], consumed', srclocOf e)
     _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)
 
 letBody :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 letBody body@(AppExp LetPat {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
 letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
-letBody body zipComs tmpDoc lastsrcloc = do
-  let (commentsBeforeBody, consumed) = commentsBefore zipComs (srclocOf body) lastsrcloc tmpDoc False
+letBody body zipComs tmpDoc srcLocOfBody = do
+  let (commentsBeforeBody, consumed) = commentsBefore zipComs (srclocOf body) srcLocOfBody tmpDoc False
   let bodyDoc = [text "in" <+> align (ppr body)]
   (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body)
 
@@ -287,10 +301,10 @@ main = mainWithOptions () [] "program" $ \args () ->
   case args of
     [file] -> Just $ do
       s <- TIO.readFile file
+      --print file
       case parseWithComments file s of
         (Left e, _) -> do
-          putStr $ "Syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e
-          putStrLn "File has not been changed."
+          putStr $ "Syntax error. File: " ++ file ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e ++ "\n"
         (Right prog1, comments1) -> do
           case prog1 of
             Prog doc decs -> do
@@ -304,10 +318,10 @@ main = mainWithOptions () [] "program" $ \args () ->
                               (prepareComments comments1 [])
                               []
                               (srclocOf $ last decs)
+              TIO.writeFile ("fmt." ++ file) formattedText1
               case parseWithComments file formattedText1 of
                 (Left e, _) -> do
-                  putStr $ "Reformatting led to syntax error: " ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e
-                  putStrLn "File has not been changed."
+                  putStr $ "Reformatting led to syntax error. File: " ++ file ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e ++ "\n"
                 (Right prog2, comments2) -> do
                   let prog1str = show prog1
                   let prog2str = show prog2
@@ -329,8 +343,16 @@ main = mainWithOptions () [] "program" $ \args () ->
                         if formattedText1 == formattedText2
                           then do
                             TIO.writeFile file formattedText2
-                            putStrLn "All done! File has been formatted."
+                            putStrLn $ "All done! File has been formatted: " ++ file
+                            mempty
                           else do
-                            putStrLn "Formatter is not idempotent, please report this"
-                    else putStrLn "ASTs differ, please report this"
+                            TIO.writeFile ("fmt1." ++ file) formattedText1
+                            TIO.writeFile ("fmt2." ++ file) formattedText2
+                            writeFile ("AST1." ++ file) prog1str
+                            writeFile ("AST2." ++ file) prog2str
+                            putStrLn $ "Formatter is not idempotent, please report this. File: " ++ file ++ "\n"
+                    else do 
+                      putStrLn $ "ASTs differ, please report this. File: " ++ file ++ "\n"
+                      writeFile ("AST1." ++ file) prog1str
+                      writeFile ("AST2." ++ file) prog2str
     _ -> Nothing
