@@ -262,12 +262,12 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
         If c t f sloc -> do
           let ifDoc = [text "if" <+> ppr c]
           let thenDoc = [text "then" <+> align (ppr t)]
-          
+
           let (docbeforeif, consumedif) = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
           let (docbeforethen, consumedthen) = commentsBefore (drop consumedif zipComs) (srclocOf t) sloc (docbeforeif ++ ifDoc) False
           let (docbeforeelse, consumedelse) = commentsBefore (drop consumedthen zipComs) (srclocOf f) sloc (docbeforethen ++ thenDoc) False
 
-          let (elseDoc, consumedfinal, lastsrcloc) = formatExpBase f (drop consumedelse zipComs) (docbeforeelse ++ [text "else" <+> align (ppr f)]) (srclocOf f)
+          let (elseDoc, consumedfinal, lastsrcloc) = formatExpBase f (drop consumedelse zipComs) (docbeforeelse ++ [text "else"]) (srclocOf f)
           (elseDoc, consumedfinal, lastsrcloc)
         _ -> do
           let (commentsBeforeExp, consumed') = commentsBefore (drop consumed zipComs) (srclocOf e) lastSrcLoc docBeforeExp False
@@ -342,7 +342,7 @@ main = mainWithOptions () [] "program" $ \args () ->
                         -- idempotence check
                         if formattedText1 == formattedText2
                           then do
-                            TIO.writeFile file formattedText2
+                            --TIO.writeFile file formattedText2
                             putStrLn $ "All done! File has been formatted: " ++ file
                             mempty
                           else do
