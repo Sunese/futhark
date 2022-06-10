@@ -120,10 +120,10 @@ docstring ('\n' : s) = line <> text "-- " <> docstring s
 docstring s = case span (/= '\n') s of
   (xs, ys) -> text xs <> docstring ys
 
-commentsBefore :: [(Int, Comment)] -> SrcLoc -> SrcLoc -> [Doc] -> Bool -> ([Doc], Int)
+commentsBefore :: [(Int, Comment)] -> SrcLoc -> SrcLoc -> [Doc] -> Bool -> ([Doc], Int, Bool)
 commentsBefore comments sloc lastSrcLoc tmpDocs inserted =
   case comments of
-    [] -> (tmpDocs, 10000)
+    [] -> (tmpDocs, 10000, inserted)
     _ ->
       if checkComment comments sloc
         then
@@ -135,8 +135,8 @@ commentsBefore comments sloc lastSrcLoc tmpDocs inserted =
             True
         else
           if inserted
-            then (tmpDocs, fst $ head comments)
-            else (tmpDocs, 0)
+            then (tmpDocs, fst $ head comments, inserted)
+            else (tmpDocs, 0, inserted)
 
 insertComment :: Comment -> SrcLoc -> [Doc] -> [Doc]
 insertComment (Comment commentstring commentloc _) sloc docs =
@@ -178,12 +178,17 @@ formatSource decs coms tmpDoc lastSrcLoc =
               --stack $ map (text . unpackCommentString) coms
               let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) (zip [1 ..] coms) tmpDoc
               formatSource (tail decs) (drop consumed coms) (tmpDoc ++ decDoc) lastSrcLoc'
+              -- stack $ tmpDoc ++ decDoc
 
 formatDec :: UncheckedDec -> [(Int, Comment)] -> [Doc] -> ([Doc], Int, SrcLoc)
 formatDec dec zipComs tmpDoc =
   case dec of
-    ValDec dec' -> formatValBind dec' zipComs tmpDoc
-    TypeDec dec' -> formatTypeBind dec' zipComs
+    ValDec dec' -> do
+      let (doc, consumed, sloc) = formatValBind dec' zipComs tmpDoc
+      (doc ++ [text ""], consumed, sloc)
+    TypeDec dec' -> do
+      let (doc, consumed, sloc) = formatTypeBind dec' zipComs tmpDoc
+      (doc ++ [text ""], consumed, sloc)
     SigDec sig -> ([ppr sig], 0, srclocOf sig)
     ModDec sd -> ([ppr sd], 0, srclocOf sd)
     OpenDec x _ -> ([text "open" <+> ppr x], 0, srclocOf x)
@@ -223,27 +228,18 @@ formatValBind dec zipComs tmpDoc = do
           where
             lengthof arg = endColOfLoc (locOf arg) - startColOfLoc (locOf arg)
 
-formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> ([Doc], Int, SrcLoc)
-formatTypeBind (TypeBind name l params te _ docComment _) coms' = do
-  let (expDoc, consumed) = constructTypeExpDoc te coms' []
-  ( prettyDocComment docComment :
-    text "type" <> ppr l <+> pprName name
-      <+> spread (map ppr params)
-      <+> equals :
-    map (indent 2) expDoc,
-    consumed,
-    srclocOf te
-    )
-
 formatExpBase :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 formatExpBase exp zipComs tmpDoc lastSrcLoc = do
-  let (docBeforeExp, consumed) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
+  let (docBeforeExp, consumed, commentinserted) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
   case exp of
-    Parens e srcloc' -> (docBeforeExp ++ [align $ parens $ ppr e], consumed, srcloc')
+    Parens e srcloc' -> 
+      if commentinserted then 
+      (docBeforeExp ++ [align $ parens $ ppr exp], consumed, srcloc')
+      else ([align $ parens $ ppr exp], consumed, srcloc')
     AppExp e _ -> do
       case e of
         DoLoop _ _ _ _ _ sloc -> do
-          let (comsDoc', consumed') = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
+          let (comsDoc', consumed', commentinserted) = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
           (docBeforeExp ++ comsDoc' ++ [ppr exp], consumed', srclocOf e)
         LetPat sizes pat e' body srcloc' -> do
           let expDocWithoutBody = firstpat
@@ -258,42 +254,55 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
                       then align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : [indent 2 (ppr e')]
                       else [align $ text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals <+> align (ppr e')]
           let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumed zipComs) expDocWithoutBody srcloc'
-          (docBeforeExp ++ bodyDoc, consumedAfterBody, srcLocOfLastLine)
+          if consumed > 0 || consumed == 10000 then
+            (docBeforeExp ++ bodyDoc, consumedAfterBody, srcLocOfLastLine)
+          else (bodyDoc, consumedAfterBody, srcLocOfLastLine)
         If c t f sloc -> do
-          let ifDoc = [text "if" <+> ppr c]
-          let thenDoc = [text "then" <+> align (ppr t)]
+          case f of
+            AppExp _ _ -> do -- multiple lines, split it up
+              let ifthenDoc = [text "if" <+> ppr c <+> text "then" <+> ppr t]
+              let (docbeforeelse, consumed'', commentinserted) = commentsBefore (drop consumed zipComs) (srclocOf f) sloc ifthenDoc False
 
-          let (docbeforeif, consumedif) = commentsBefore (drop consumed zipComs) sloc lastSrcLoc docBeforeExp False
-          let (docbeforethen, consumedthen) = commentsBefore (drop consumedif zipComs) (srclocOf t) sloc (docbeforeif ++ ifDoc) False
-          let (docbeforeelse, consumedelse) = commentsBefore (drop consumedthen zipComs) (srclocOf f) sloc (docbeforethen ++ thenDoc) False
+              let (elsebody, consumed''', lastSrcLoc') = formatExpBase f (drop consumed'' zipComs) docbeforeelse sloc
+              let elsebody' = (text "else" <+> head elsebody) : tail elsebody
+              (docbeforeelse ++ elsebody', consumed''', lastSrcLoc')
 
-          let (elseDoc, consumedfinal, lastsrcloc) = formatExpBase f (drop consumedelse zipComs) (docbeforeelse ++ [text "else"]) (srclocOf f)
-          (elseDoc, consumedfinal, lastsrcloc)
+            _ -> do -- probably an atom, just ppr it
+              let doc = (text "if" <+> ppr c <+> text "then" <+> ppr t) : [text "else" <+> ppr f]
+              (doc, consumed, srclocOf f)
         _ -> do
-          let (commentsBeforeExp, consumed') = commentsBefore (drop consumed zipComs) (srclocOf e) lastSrcLoc docBeforeExp False
+          let (commentsBeforeExp, consumed', commentinserted') = commentsBefore (drop consumed zipComs) (srclocOf e) lastSrcLoc docBeforeExp False
           --(commentsBeforeExp ++ [ppr exp], consumed', srclocOf e)
           --(docBeforeExp, consumed', srclocOf e)
-          (commentsBeforeExp ++ [ppr e], consumed', srclocOf e)
-    _ -> (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)
+          if commentinserted || commentinserted'
+            then (commentsBeforeExp ++ [ppr exp], consumed', srclocOf e)
+            else ([ppr exp], consumed', srclocOf e)
+    _ ->
+      if commentinserted then
+        (docBeforeExp ++ [ppr exp], consumed, srclocOf exp)
+      else
+        ([ppr exp], consumed, srclocOf exp)
 
 letBody :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 letBody body@(AppExp LetPat {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
 letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfBody = formatExpBase body zipComs tmpDoc srcLocOfBody
 letBody body zipComs tmpDoc srcLocOfBody = do
-  let (commentsBeforeBody, consumed) = commentsBefore zipComs (srclocOf body) srcLocOfBody tmpDoc False
+  let (commentsBeforeBody, consumed, commentinserted) = commentsBefore zipComs (srclocOf body) srcLocOfBody tmpDoc False
   let bodyDoc = [text "in" <+> align (ppr body)]
   (commentsBeforeBody ++ bodyDoc, consumed, srclocOf body)
 
-constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int)
-constructTypeExpDoc exp coms' expDoc =
-  case coms' of
-    [] -> (expDoc ++ [ppr exp], 10000)
-    _ ->
-      if checkComment coms' (srclocOf exp)
-        then do
-          let tmpDoc = expDoc ++ [align . text . unpackCommentString $ head $ unzipComs coms']
-          constructTypeExpDoc exp (tail coms') tmpDoc
-        else (expDoc ++ [ppr exp], fst $ head coms')
+formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int, SrcLoc)
+formatTypeBind (TypeBind name l params te _ _ sloc) _ _ = do
+  let doc = [text "type" <> ppr l <+> pprName name
+        <+> spread (map ppr params)
+        <+> equals <+> ppr te]
+  (doc, 0, sloc)
+
+constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
+constructTypeExpDoc exp zipComs tmpDoc lastSrcLoc = do
+  let (docBefore, consumed, commentinserted) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
+  let docBefore' = dropEnd1 docBefore ++ [last docBefore <+> ppr exp]
+  (docBefore', consumed, srclocOf exp)
 
 -- | Run @futhark fmt@.
 main :: String -> [String] -> IO ()
@@ -321,7 +330,7 @@ main = mainWithOptions () [] "program" $ \args () ->
               TIO.writeFile ("fmt." ++ file) formattedText1
               case parseWithComments file formattedText1 of
                 (Left e, _) -> do
-                  putStr $ "Reformatting led to syntax error. File: " ++ file ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e ++ "\n"
+                  putStr $ "The formatted file contains a synax error. File: " ++ file ++ locStr (syntaxErrorLoc e) ++ "\n" ++ syntaxErrorMsg e ++ "\n"
                 (Right prog2, comments2) -> do
                   let prog1str = show prog1
                   let prog2str = show prog2
@@ -355,4 +364,5 @@ main = mainWithOptions () [] "program" $ \args () ->
                       putStrLn $ "ASTs differ, please report this. File: " ++ file ++ "\n"
                       writeFile ("AST1." ++ file) prog1str
                       writeFile ("AST2." ++ file) prog2str
+                      mempty
     _ -> Nothing

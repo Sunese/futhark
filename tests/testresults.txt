@@ -1,0 +1,198 @@
+All done! File has been formatted: BabyBearFun.fut
+All done! File has been formatted: BabyBearImp.fut
+All done! File has been formatted: allocs.fut
+ASTs differ, please report this. File: american_option.fut
+
+All done! File has been formatted: apply-or-index.fut
+All done! File has been formatted: array14-running-example.fut
+All done! File has been formatted: arrayInTupleArray.fut
+All done! File has been formatted: arraylit.fut
+All done! File has been formatted: arraylit1.fut
+All done! File has been formatted: arraylit2.fut
+All done! File has been formatted: arraylit3.fut
+All done! File has been formatted: arraylit4.fut
+All done! File has been formatted: ascription0.fut
+All done! File has been formatted: ascription1.fut
+All done! File has been formatted: ascription2.fut
+All done! File has been formatted: ascription3.fut
+All done! File has been formatted: ascription4.fut
+All done! File has been formatted: assert0.fut
+All done! File has been formatted: assert1.fut
+All done! File has been formatted: assert2.fut
+All done! File has been formatted: assert3.fut
+All done! File has been formatted: backtick.fut
+The formatted file contains a synax error. File: bad-reduce.futbad-reduce.fut:7:3-6
+Unexpected token: 'type'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+The formatted file contains a synax error. File: bad_names.futbad_names.fut:11:17-17
+Unexpected end of file.
+Expected one of the following: else ':' ':>'
+
+All done! File has been formatted: badentry0.fut
+All done! File has been formatted: badentry1.fut
+All done! File has been formatted: badentry2.fut
+All done! File has been formatted: badentry3.fut
+All done! File has been formatted: badentry4.fut
+All done! File has been formatted: badentry5.fut
+All done! File has been formatted: badentry6.fut
+All done! File has been formatted: badentry7.fut
+All done! File has been formatted: badentry8.fut
+All done! File has been formatted: badentry9.fut
+Formatter is not idempotent, please report this. File: big0.fut
+
+All done! File has been formatted: big1.fut
+All done! File has been formatted: big2.fut
+ASTs differ, please report this. File: bitwise.fut
+
+The formatted file contains a synax error. File: blackscholes.futblackscholes.fut:778:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+All done! File has been formatted: bounds-elim0.fut
+All done! File has been formatted: bounds-elim1.fut
+All done! File has been formatted: bounds-elim2.fut
+All done! File has been formatted: bounds-error0.fut
+All done! File has been formatted: bounds-error1.fut
+All done! File has been formatted: branch_array.fut
+All done! File has been formatted: collision.fut
+ASTs differ, please report this. File: complement.fut
+
+All done! File has been formatted: concat.fut
+All done! File has been formatted: concat1.fut
+All done! File has been formatted: concat10.fut
+All done! File has been formatted: concat2.fut
+All done! File has been formatted: concat3.fut
+All done! File has been formatted: concat4.fut
+All done! File has been formatted: concat7.fut
+All done! File has been formatted: concat8.fut
+All done! File has been formatted: concat9.fut
+All done! File has been formatted: constant_folding0.fut
+All done! File has been formatted: convert_id.fut
+The formatted file contains a synax error. File: copyPropTest1.futcopyPropTest1.fut:18:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+The formatted file contains a synax error. File: copyPropTest2.futcopyPropTest2.fut:28:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+All done! File has been formatted: copyPropTest3.fut
+All done! File has been formatted: cse0.fut
+All done! File has been formatted: curry0.fut
+All done! File has been formatted: curry1.fut
+All done! File has been formatted: curry2.fut
+The formatted file contains a synax error. File: deadCodeElimTest1.futdeadCodeElimTest1.fut:25:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+The formatted file contains a synax error. File: deadCodeElimTest2.futdeadCodeElimTest2.fut:25:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+All done! File has been formatted: doublebuffer.fut
+All done! File has been formatted: entryval.fut
+All done! File has been formatted: eqarrays0.fut
+All done! File has been formatted: eqarrays1.fut
+All done! File has been formatted: f16kernel.fut
+The formatted file contains a synax error. File: fibfun.futfibfun.fut:33:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+All done! File has been formatted: fibloop.fut
+All done! File has been formatted: float_32_64.fut
+All done! File has been formatted: floatunderscores.fut
+ASTs differ, please report this. File: fourier.fut
+
+All done! File has been formatted: funcall-error0.fut
+All done! File has been formatted: funcall-error1.fut
+The formatted file contains a synax error. File: gauss_jordan.futgauss_jordan.fut:40:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+The formatted file contains a synax error. File: gregorian.futgregorian.fut:10:3-5
+Unexpected token: 'def'
+Expected one of the following: if let loop match id 'id[' 'qid[' 'qid.(' constructor intlit i8lit i16lit i32lit i64lit u8lit u16lit u32lit u64lit floatlit f16lit f32lit f64lit stringlit charlit '-' '!' '(' '{' '[' '#[' '\\' assert true false hole
+
+All done! File has been formatted: guysteele_sequential.fut
+All done! File has been formatted: hexfloats.fut
+The formatted file contains a synax error. File: hoist-consume.futhoist-consume.fut:17:1-3
+Unexpected token: 'def'
+Expected one of the following: else ':' ':>'
+
+The formatted file contains a synax error. File: hoist-map.futhoist-map.fut:19:34-34
+Unexpected token: ':'
+Expected one of the following: ')'
+
+All done! File has been formatted: hoist-unsafe.fut
+All done! File has been formatted: hoist-unsafe2.fut
+All done! File has been formatted: if0.fut
+All done! File has been formatted: if1.fut
+ASTs differ, please report this. File: implicit_method.fut
+
+All done! File has been formatted: in-place-distribute.fut
+All done! File has been formatted: include_basic.fut
+All done! File has been formatted: include_basic_includee.fut
+All done! File has been formatted: include_many.fut
+All done! File has been formatted: include_many_includee0.fut
+All done! File has been formatted: include_many_includee0_includee.fut
+All done! File has been formatted: include_many_includee1.fut
+All done! File has been formatted: index0.fut
+All done! File has been formatted: index1.fut
+All done! File has been formatted: index10.fut
+All done! File has been formatted: index11.fut
+All done! File has been formatted: index12.fut
+All done! File has been formatted: index2.fut
+All done! File has been formatted: index4.fut
+All done! File has been formatted: index5.fut
+All done! File has been formatted: index6.fut
+All done! File has been formatted: index7.fut
+All done! File has been formatted: index8.fut
+All done! File has been formatted: index9.fut
+All done! File has been formatted: inlineTest1.fut
+All done! File has been formatted: inplace-replicate.fut
+All done! File has been formatted: inplace0.fut
+All done! File has been formatted: inplace1.fut
+All done! File has been formatted: inplace2.fut
+All done! File has been formatted: inplace3.fut
+All done! File has been formatted: inplace4.fut
+All done! File has been formatted: inplace5.fut
+All done! File has been formatted: inplacelowering0.fut
+All done! File has been formatted: inplacelowering1.fut
+All done! File has been formatted: inplacelowering2.fut
+All done! File has been formatted: inplacelowering3.fut
+All done! File has been formatted: inplacelowering4.fut
+All done! File has been formatted: inplacelowering5.fut
+All done! File has been formatted: inplacelowering6.fut
+All done! File has been formatted: inplacelowering7.fut
+All done! File has been formatted: int.fut
+All done! File has been formatted: intunderscores.fut
+All done! File has been formatted: iota0.fut
+All done! File has been formatted: ipl-bug.fut
+ASTs differ, please report this. File: issue1025.fut
+
+All done! File has been formatted: issue1043.fut
+The formatted file contains a synax error. File: issue1053.futissue1053.fut:17:1-3
+Unexpected token: 'def'
+Expected one of the following: else ':' ':>'
+
+All done! File has been formatted: issue1054.fut
+ASTs differ, please report this. File: issue1068.fut
+
+All done! File has been formatted: issue1069.fut
+ASTs differ, please report this. File: issue1073.fut
+
+ASTs differ, please report this. File: issue1074.fut
+
+The formatted file contains a synax error. File: issue1080.futissue1080.fut:8:12-13
+Unexpected token: '=-'
+Expected one of the following: 
+
+All done! File has been formatted: issue1100.fut
+All done! File has been formatted: issue1112.fut
+All done! File has been formatted: issue1139.fut
+All done! File has been formatted: issue1142.fut
+ASTs differ, please report this. File: issue1143.fut
+
+All done! File has been formatted: issue1153.fut
+All done! File has been formatted: issue1155.fut
