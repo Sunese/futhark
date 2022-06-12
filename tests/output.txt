@@ -1,0 +1,83 @@
+ASTs differ, please report this. File: american_option.fut
+ASTs differ, please report this. File: bad-reduce.fut
+Formatter is not idempotent, please report this. File: big0.fut
+ASTs differ, please report this. File: bitwise.fut
+ASTs differ, please report this. File: blackscholes.fut
+ASTs differ, please report this. File: complement.fut
+ASTs differ, please report this. File: copyPropTest1.fut
+ASTs differ, please report this. File: copyPropTest2.fut
+ASTs differ, please report this. File: deadCodeElimTest1.fut
+ASTs differ, please report this. File: deadCodeElimTest2.fut
+ASTs differ, please report this. File: fourier.fut
+The formatted file contains a synax error. File: gauss_jordan.futgauss_jordan.fut:34:3-5
+ASTs differ, please report this. File: gregorian.fut
+The formatted file contains a synax error. File: hoist-map.futhoist-map.fut:15:34-34
+ASTs differ, please report this. File: implicit_method.fut
+ASTs differ, please report this. File: issue1025.fut
+Formatter is not idempotent, please report this. File: issue1053.fut
+ASTs differ, please report this. File: issue1068.fut
+ASTs differ, please report this. File: issue1073.fut
+ASTs differ, please report this. File: issue1074.fut
+The formatted file contains a synax error. File: issue1080.futissue1080.fut:10:12-13
+ASTs differ, please report this. File: issue1143.fut
+The formatted file contains a synax error. File: issue1168.futissue1168.fut:261:5-6
+ASTs differ, please report this. File: issue1209.fut
+ASTs differ, please report this. File: issue1237.fut
+ASTs differ, please report this. File: issue1241.fut
+ASTs differ, please report this. File: issue1250.fut
+ASTs differ, please report this. File: issue1350.fut
+The formatted file contains a synax error. File: issue1366.futissue1366.fut:1:1-8
+ASTs differ, please report this. File: issue1424.fut
+The formatted file contains a synax error. File: issue1481.futissue1481.fut:23:5-5
+ASTs differ, please report this. File: issue1500.fut
+ASTs differ, please report this. File: issue1510.fut
+ASTs differ, please report this. File: issue1512.fut
+ASTs differ, please report this. File: issue1523.fut
+The formatted file contains a synax error. File: issue1533.futissue1533.fut:21:12-13
+The formatted file contains a synax error. File: issue1535.futissue1535.fut:1:29-29
+ASTs differ, please report this. File: issue1569.fut
+The formatted file contains a synax error. File: issue1579.futissue1579.fut:204:3-8
+ASTs differ, please report this. File: issue1593.fut
+The formatted file contains a synax error. File: issue1610.futissue1610.fut:197:3-8
+ASTs differ, please report this. File: issue245.fut
+ASTs differ, please report this. File: issue246.fut
+ASTs differ, please report this. File: issue248.fut
+ASTs differ, please report this. File: issue352.fut
+ASTs differ, please report this. File: issue356.fut
+ASTs differ, please report this. File: issue407.fut
+ASTs differ, please report this. File: issue410.fut
+ASTs differ, please report this. File: issue419.fut
+ASTs differ, please report this. File: issue485.fut
+Formatter is not idempotent, please report this. File: issue561.fut
+ASTs differ, please report this. File: issue712.fut
+ASTs differ, please report this. File: issue728.fut
+ASTs differ, please report this. File: issue763.fut
+ASTs differ, please report this. File: issue782.fut
+The formatted file contains a synax error. File: issue793.futissue793.fut:43:3-6
+ASTs differ, please report this. File: issue795.fut
+ASTs differ, please report this. File: issue813.fut
+ASTs differ, please report this. File: issue873.fut
+The formatted file contains a synax error. File: issue931.futissue931.fut:1:22-22
+ASTs differ, please report this. File: issue941.fut
+ASTs differ, please report this. File: issue942.fut
+The formatted file contains a synax error. File: linear_solve.futlinear_solve.fut:36:3-5
+ASTs differ, please report this. File: localfunction4.fut
+ASTs differ, please report this. File: localfunction5.fut
+ASTs differ, please report this. File: localfunction8.fut
+ASTs differ, please report this. File: lss.fut
+ASTs differ, please report this. File: lu-factorisation.fut
+ASTs differ, please report this. File: map_tridag_par.fut
+ASTs differ, please report this. File: mss.fut
+ASTs differ, please report this. File: multinv16.fut
+ASTs differ, please report this. File: nestedmain.fut
+ASTs differ, please report this. File: normalizeTest1.fut
+ASTs differ, please report this. File: perceptron.fut
+ASTs differ, please report this. File: phantomsizes.fut
+ASTs differ, please report this. File: quickselect.fut
+ASTs differ, please report this. File: rand0.fut
+ASTs differ, please report this. File: replicate1.fut
+ASTs differ, please report this. File: returntype-error3.fut
+ASTs differ, please report this. File: sobolChunked.fut
+ASTs differ, please report this. File: streamRed_interchange.fut
+The formatted file contains a synax error. File: tokens.futtokens.fut:24:5-7
+The formatted file contains a synax error. File: tridag.futtridag.fut:42:3-5

@@ -1,4 +1,4 @@
 for i in *.fut
 do
-    futhark fmt $i
+    futhark fmt $i >> output.txt
 done
