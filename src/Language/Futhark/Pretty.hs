@@ -170,7 +170,7 @@ instance Pretty (ShapeDecl dim) => Pretty (TypeArg dim) where
 
 instance (Eq vn, IsName vn) => Pretty (TypeExp vn) where
   ppr (TEUnique t _) = text "*" <> ppr t
-  ppr (TEArray at d _) = brackets (ppr d) <> ppr at
+  ppr (TEArray at d _) = parens $ brackets (ppr d) <> ppr at
   ppr (TETuple ts _) = parens $ commasep $ map ppr ts
   ppr (TERecord fs _) = braces $ commasep $ map ppField fs
     where
@@ -180,7 +180,7 @@ instance (Eq vn, IsName vn) => Pretty (TypeExp vn) where
   ppr (TEArrow (Just v) t1 t2 _) = parens v' <+> text "->" <+> ppr t2
     where
       v' = pprName v <> colon <+> ppr t1
-  ppr (TEArrow Nothing t1 t2 _) = ppr t1 <+> text "->" <+> ppr t2
+  ppr (TEArrow Nothing t1 t2 _) = parens $ ppr t1 <+> text "->" <+> ppr t2
   ppr (TESum cs _) =
     align $ cat $ punctuate (text " |" <> softline) $ map ppConstr cs
     where
@@ -283,20 +283,19 @@ instance (Eq vn, IsName vn, Annot f) => Pretty (AppExpBase f vn) where
           <+> text "="
           <+> align (ppr ve)
           </> letBody body
-  pprPrec p (Range start maybe_step end _) =
-    parensIf (p /= -1) $
-      ppr start
-        <> maybe mempty ((text ".." <>) . ppr) maybe_step
-        <> case end of
-          DownToExclusive end' -> text "..>" <> ppr end'
-          ToInclusive end' -> text "..." <> ppr end'
-          UpToExclusive end' -> text "..<" <> ppr end'
+  pprPrec _ (Range start maybe_step end _) =
+    ppr start
+      <> maybe mempty ((text ".." <>) . ppr) maybe_step
+      <> case end of
+        DownToExclusive end' -> text "..>" <> ppr end'
+        ToInclusive end' -> text "..." <> ppr end'
+        UpToExclusive end' -> text "..<" <> ppr end'
   pprPrec _ (If c t f _) =
     text "if" <+> ppr c
       </> text "then" <+> align (ppr t)
       </> text "else" <+> align (ppr f)
-  pprPrec p (Apply f arg _ _) =
-    parensIf (p >= 10) $ pprPrec 0 f <+/> pprPrec 10 arg
+  pprPrec _ (Apply f arg _ _) =
+    pprPrec 0 f <+/> pprPrec 10 arg
 
 instance (Eq vn, IsName vn, Annot f) => Pretty (ExpBase f vn) where
   ppr = pprPrec (-1)
@@ -342,7 +341,7 @@ instance (Eq vn, IsName vn, Annot f) => Pretty (ExpBase f vn) where
     text $ show $ map (chr . fromIntegral) s
   pprPrec _ (Project k e _ _) = ppr e <> text "." <> ppr k
   pprPrec _ (Negate e _) = text "-" <> ppr e
-  pprPrec _ (Not e _) = text "-" <> ppr e
+  pprPrec _ (Not e _) = text "!" <> ppr e
   pprPrec _ (Update src idxs ve _) =
     ppr src <+> text "with"
       <+> brackets (commasep (map ppr idxs))
@@ -441,7 +440,7 @@ instance (Eq vn, IsName vn, Annot f) => Pretty (ModExpBase f vn) where
   ppr (ModParens e _) = parens $ ppr e
   ppr (ModImport v _ _) = text "import" <+> ppr (show v)
   ppr (ModDecs ds _) = nestedBlock "{" "}" (stack $ punctuate line $ map ppr ds)
-  ppr (ModApply f a _ _ _) = parens $ ppr f <+> parens (ppr a)
+  ppr (ModApply f a _ _ _) = ppr f <+> ppr a
   ppr (ModAscript me se _ _) = ppr me <> colon <+> ppr se
   ppr (ModLambda param maybe_sig body _) =
     text "\\" <> ppr param <> maybe_sig'
@@ -574,6 +573,5 @@ prettyBinOp p bop x y =
     precedence Rem = 5
     precedence Pow = 6
     precedence Backtick = 9
-    rprecedence Minus = 10
     rprecedence Divide = 10
     rprecedence op = precedence op
