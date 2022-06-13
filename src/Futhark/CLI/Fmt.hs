@@ -6,7 +6,7 @@ import Control.Monad
 import Data.List (isSuffixOf)
 import Data.Loc
 import Data.Maybe
-import Data.Text (cons, dropEnd, pack, unpack)
+import Data.Text (dropEnd, pack, unpack, cons)
 import qualified Data.Text.IO as TIO
 import Futhark.Util (trim)
 import Futhark.Util.Loc hiding (SrcLoc)
@@ -126,6 +126,7 @@ docstring s = case span (/= '\n') s of
 toBeDropped :: [(Int, Comment)] -> Int
 toBeDropped coms = fst (head coms) - 1
 
+
 commentsBefore :: [(Int, Comment)] -> SrcLoc -> SrcLoc -> [Doc] -> Bool -> ([Doc], Int, Bool)
 commentsBefore comments sloc lastSrcLoc tmpDocs inserted =
   case comments of
@@ -180,22 +181,21 @@ formatSource decs coms tmpDoc lastSrcLoc =
         _ -> do
           let (decDoc, consumed, lastSrcLoc') = formatDec (head decs) coms tmpDoc lastSrcLoc
           formatSource (tail decs) (drop consumed coms) decDoc lastSrcLoc'
-
--- stack $ tmpDoc ++ decDoc
+          -- stack $ tmpDoc ++ decDoc
 
 formatDec :: UncheckedDec -> [Comment] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 formatDec dec coms tmpDoc lastsrcloc = do
   -- Check if there was a comment before new declaration
   let zipComs = zip [1 ..] coms
   let (tmpDoc', consumed, inserted) = commentsBefore zipComs (srclocOf dec) lastsrcloc tmpDoc False
-  let tmpDoc'' = tmpDoc'
+  let tmpDoc'' = tmpDoc' ++ [text ""]
   case dec of
     ValDec dec' -> do
       formatValBind dec' (drop consumed zipComs) tmpDoc''
     TypeDec dec' -> do
       (tmpDoc'' ++ [ppr dec'], consumed, srclocOf dec')
     SigDec sig -> (tmpDoc'' ++ [ppr sig], consumed, srclocOf sig)
-    ModDec sd ->
+    ModDec sd -> 
       (tmpDoc'' ++ [ppr sd], consumed, srclocOf sd)
     OpenDec x _ -> (tmpDoc'' ++ [text "open" <+> ppr x], consumed, srclocOf x)
     LocalDec dec' sloc -> do
@@ -209,8 +209,8 @@ formatValBind dec zipComs topLevelDoc = do
   where
     constructDocWithoutBody :: (Eq vn, IsName vn, Annot f) => ValBindBase f vn -> [Doc] -> [Doc]
     constructDocWithoutBody (ValBind entry name retdecl rettype tparams args _ docCom attrs _) bodyDoc =
-      topLevelDoc
-        ++ mconcat (map ((<> line) . ppr) attrs)
+      topLevelDoc ++
+      mconcat (map ((<> line) . ppr) attrs)
         <> prettyDocComment docCom
         <> text fun
         <+> pprName name
@@ -236,12 +236,17 @@ formatValBind dec zipComs topLevelDoc = do
 
 formatExpBase :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 formatExpBase exp zipComs tmpDoc lastSrcLoc = do
-  let (docBeforeExp, consumed, commentinserted) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
+  let (docBeforeExp, consumed, commentinserted) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False 
+  --- docBeforeExp =
+  -- 1) []
+  -- 2) if k == 1 then x == 0
+  -- 3) 
   case exp of
     AppExp e _ -> do
       case e of
         LetPat sizes pat e' body sloc -> do
           let (letDoc, _, lastsrcloc) = formatExpBase e' [] [] sloc -- dont pass coms or doc along because we already checked for comments before this let
+
           let expDocWithoutBody = firstpat -- contains everything before the body of the let (also comments)
                 where
                   linebreak = case e' of
@@ -251,15 +256,22 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
                     _ -> hasArrayLit e'
                   firstpat =
                     if linebreak
-                      then docBeforeExp ++ align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : map (indent 2) letDoc
+                      then docBeforeExp ++  align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals) : map (indent 2) letDoc
                       else do
                         docBeforeExp ++ align (text "let" <+> spread (map ppr sizes) <+> align (ppr pat) <+> equals <+> align (head letDoc)) : tail letDoc
           let (bodyDoc, consumedAfterBody, srcLocOfLastLine) = letBody body (drop consumed zipComs) expDocWithoutBody lastsrcloc
           (bodyDoc, consumedAfterBody, srcLocOfLastLine)
         If c t f sloc -> do
-          let ifthenDoc = docBeforeExp ++ [text "if" <+> ppr c <+> text "then" <+> ppr t <+> text "else"]
-          let (elsebody, consumed', lastSrcLoc') = formatExpBase f (drop consumed zipComs) ifthenDoc sloc
-          (elsebody, consumed', lastSrcLoc')
+          case f of
+            AppExp _ _ -> do -- multiple lines, split it up
+              -- check if it is nested if-then-else, cause if it is, an "else" shall be put in front
+              let ifthenDoc = docBeforeExp ++ [text "if" <+> ppr c <+> text "then" <+> ppr t <+> text "else"]
+              let (elsebody, consumed'', lastSrcLoc') = formatExpBase f (drop consumed zipComs) ifthenDoc sloc
+              (elsebody, consumed'', lastSrcLoc')
+
+            _ -> do -- probably an atom, just ppr it
+              let doc = (text "if" <+> ppr c <+> text "then" <+> ppr t <+> text "else") : [ppr f]
+              (docBeforeExp ++ doc, consumed, srclocOf f)
         _ -> do
           (docBeforeExp ++ [ppr exp], consumed, srclocOf e)
     _ ->
@@ -267,33 +279,27 @@ formatExpBase exp zipComs tmpDoc lastSrcLoc = do
 
 letBody :: (Eq vn, IsName vn, Annot f) => ExpBase f vn -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 letBody body@(AppExp LetPat {} _) zipComs tmpDoc srcLocOfLet = do
-  let (docandcommentsbefore, consumed, _) = commentsBefore zipComs (srclocOf body) srcLocOfLet tmpDoc False
+  let (docandcommentsbefore, consumed, commentinserted) = commentsBefore zipComs (srclocOf body) srcLocOfLet tmpDoc False
   formatExpBase body (drop consumed zipComs) docandcommentsbefore srcLocOfLet
 
-letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfLet = do
-  let (docandcommentsbefore, consumed, _) = commentsBefore zipComs (srclocOf body) srcLocOfLet tmpDoc False
-  formatExpBase body (drop consumed zipComs) docandcommentsbefore srcLocOfLet
+letBody body@(AppExp LetFun {} _) zipComs tmpDoc srcLocOfLet = formatExpBase body zipComs tmpDoc srcLocOfLet
 
 letBody body zipComs tmpDoc srcLocOfLet = do
   let doc = last tmpDoc
   let doc' = doc <+> text "in"
   let (doc'', consumed, lastsrcloc) = formatExpBase body zipComs (dropEnd1 tmpDoc ++ [doc']) srcLocOfLet
   (doc'', consumed, lastsrcloc)
-
--- (commentsBeforeBody, consumed, srcLocOfLet)
+  --(commentsBeforeBody, consumed, srcLocOfLet)
 
 formatTypeBind :: TypeBindBase NoInfo Name -> [(Int, Comment)] -> [Doc] -> ([Doc], Int, SrcLoc)
 formatTypeBind (TypeBind name l params te _ _ sloc) zipComs tmpDoc = do
-  let doc =
-        [ text "type" <> ppr l <+> pprName name
-            <+> spread (map ppr params)
-            <+> equals
-            <+> ppr te
-        ]
+  let doc = [text "type" <> ppr l <+> pprName name
+        <+> spread (map ppr params)
+        <+> equals <+> ppr te]
   case zipComs of
     [] -> (tmpDoc ++ doc, 0, sloc)
     _ -> (tmpDoc ++ doc, toBeDropped zipComs, sloc)
-
+    
 constructTypeExpDoc :: TypeExp Name -> [(Int, Comment)] -> [Doc] -> SrcLoc -> ([Doc], Int, SrcLoc)
 constructTypeExpDoc exp zipComs tmpDoc lastSrcLoc = do
   let (docBefore, consumed, commentinserted) = commentsBefore zipComs (srclocOf exp) lastSrcLoc tmpDoc False
@@ -306,10 +312,9 @@ main = mainWithOptions () [] "program" $ \args () ->
   case args of
     [file] -> Just $ do
       s <- TIO.readFile file
-      -- print file
       case parseWithComments file s of
         (Left e, _) -> do
-          putStrLn $ "Syntax error. File: " ++ file ++ locStr (syntaxErrorLoc e)
+          putStr $ "Syntax error. File: " ++ file ++ locStr (syntaxErrorLoc e)
         (Right prog1, comments1) -> do
           case prog1 of
             Prog doc decs -> do
@@ -323,11 +328,9 @@ main = mainWithOptions () [] "program" $ \args () ->
                               (prepareComments comments1 [])
                               []
                               (srclocOf $ last decs)
-              -- TIO.writeFile ("fmt." ++ file) formattedText1
               case parseWithComments file formattedText1 of
                 (Left e, _) -> do
-                  -- putStrLn $ "The formatted file contains a synax error. File: " ++ file ++ locStr (syntaxErrorLoc e)
-                  mempty
+                  putStrLn $ "The formatted file contains a synax error. File: " ++ file ++ locStr (syntaxErrorLoc e)
                 (Right prog2, comments2) -> do
                   let prog1str = show prog1
                   let prog2str = show prog2
@@ -348,19 +351,10 @@ main = mainWithOptions () [] "program" $ \args () ->
                         -- idempotence check
                         if formattedText1 == formattedText2
                           then do
-                            -- TIO.writeFile file formattedText2
+                            TIO.writeFile file formattedText2
                             putStrLn $ "All done! File has been formatted: " ++ file
-                            mempty
                           else do
-                            -- TIO.writeFile ("fmt1." ++ file) formattedText1
-                            -- TIO.writeFile ("fmt2." ++ file) formattedText2
-                            -- writeFile ("AST1." ++ file) prog1str
-                            -- writeFile ("AST2." ++ file) prog2str
                             putStrLn $ "Formatter is not idempotent, please report this. File: " ++ file
-                            mempty
-                    else do
+                    else do 
                       putStrLn $ "ASTs differ, please report this. File: " ++ file
-                      -- writeFile ("AST1." ++ file) prog1str
-                      -- writeFile ("AST2." ++ file) prog2str
-                      mempty
     _ -> Nothing
